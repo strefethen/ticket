@@ -999,25 +999,6 @@ cmd_link() {
     fi
 }
 
-remove_link_from_file() {
-    local file="$1"
-    local target_id="$2"
-
-    local current_links
-    current_links=$(yaml_field "$file" "links" || true)
-
-    # Skip if not present
-    if [[ -z "$current_links" ]] || ! echo "$current_links" | _grep -q "$target_id"; then
-        return 0
-    fi
-
-    local new_links
-    new_links=$(echo "$current_links" | sed "s/, *$target_id//g; s/$target_id, *//g; s/$target_id//g")
-    [[ "$new_links" == "[]" || "$new_links" == "[, ]" || "$new_links" == "[ ]" ]] && new_links="[]"
-
-    update_yaml_field "$file" "links" "$new_links"
-}
-
 cmd_unlink() {
     if [[ $# -lt 2 ]]; then
         echo "Usage: ticket unlink <id> <target-id>" >&2
@@ -1041,10 +1022,18 @@ cmd_unlink() {
     fi
 
     # Remove from both files
-    remove_link_from_file "$file" "$target_id"
-    remove_link_from_file "$target_file" "$id"
+    for pair in "$file:$target_id" "$target_file:$id"; do
+        local f="${pair%%:*}" tid="${pair#*:}"
+        local links
+        links=$(yaml_field "$f" "links" || true)
+        [[ -z "$links" ]] || ! echo "$links" | _grep -q "$tid" && continue
+        local new_links
+        new_links=$(echo "$links" | sed "s/, *$tid//g; s/$tid, *//g; s/$tid//g")
+        [[ "$new_links" == "[]" || "$new_links" == "[, ]" || "$new_links" == "[ ]" ]] && new_links="[]"
+        update_yaml_field "$f" "links" "$new_links"
+    done
 
-    echo "Removed link: $(basename "$file" .md) <-> $target_id"
+    echo "Removed link: $id <-> $target_id"
 }
 
 cmd_show() {
