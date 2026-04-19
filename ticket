@@ -147,10 +147,14 @@ update_yaml_field() {
     if _grep -q "^${field}:" "$file"; then
         _sed_i "$file" "s/^${field}:.*/${field}: ${value}/"
     else
-        # Insert after first --- (beginning of frontmatter)
-        _sed_i "$file" "0,/^---$/ { /^---$/a\\
-${field}: ${value}
-}"
+        # Insert after first --- (beginning of frontmatter).
+        # awk used in place of sed because BSD sed (macOS) does not
+        # support the GNU "0,/pat/ { /pat/a\\ ... }" form reliably.
+        local tmp="${file}.tmp.$$"
+        awk -v field="$field" -v value="$value" '
+            NR==1 && /^---$/ { print; print field ": " value; next }
+            { print }
+        ' "$file" > "$tmp" && mv "$tmp" "$file"
     fi
 }
 
