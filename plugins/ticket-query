@@ -37,6 +37,9 @@ function emit() {
                 for (j = 1; j <= n; j++) {
                     if (j > 1) printf ","
                     gsub(/^ +| +$/, "", items[j])
+                    # Strip surrounding single/double quotes from YAML-quoted items
+                    # so re-quoting for JSON does not produce output like [""foo""]
+                    gsub(/^["\047]|["\047]$/, "", items[j])
                     if (items[j] != "") printf "\"%s\"", items[j]
                 }
                 printf "]"
