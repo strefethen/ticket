@@ -1,0 +1,286 @@
+#!/usr/bin/env bash
+# tk-plugin: View the tk:<repo>:audit:claims Redis stream
+# tk-plugin-version: 0.1.0
+#
+# Usage:
+#   tk audit                           Last 50 events, newest first
+#   tk audit --count 200               Override result count
+#   tk audit --ticket fs-m6hr          Filter by ticket id
+#   tk audit --event acquire           Filter by event type (acquire|release|write-succeeded|all)
+#   tk audit --path <substr>           Filter by path substring match
+#   tk audit --since <ts>              Time floor: epoch seconds or ISO-8601
+#   tk audit --repo <name>             Override repo namespace
+#   tk audit --json                    Emit JSON array instead of pretty table
+#   tk audit --tail                    Follow (blocking XREAD); print new events as they arrive
+#
+# Env:
+#   REDIS_HOST, REDIS_PORT (default 6379), REDIS_PASSWORD — connection
+#   TK_REPO — override repo namespace (default: derived from TICKETS_DIR parent)
+#
+# Stream key: tk:<repo>:audit:claims
+#
+# Redis discipline: XREVRANGE / XRANGE / XREAD on one known stream key only.
+# No KEYS, no SCAN, no whole-DB ops.
+
+set -u
+
+COUNT=50
+FILTER_TICKET=""
+FILTER_EVENT=""
+FILTER_PATH=""
+SINCE=""
+REPO_OVERRIDE=""
+JSON=0
+TAIL=0
+
+usage() {
+    sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'
+}
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --count)  COUNT="$2"; shift 2 ;;
+        --ticket) FILTER_TICKET="$2"; shift 2 ;;
+        --event)  FILTER_EVENT="$2"; shift 2 ;;
+        --path)   FILTER_PATH="$2"; shift 2 ;;
+        --since)  SINCE="$2"; shift 2 ;;
+        --repo)   REPO_OVERRIDE="$2"; shift 2 ;;
+        --json)   JSON=1; shift ;;
+        --tail)   TAIL=1; shift ;;
+        -h|--help) usage; exit 0 ;;
+        *) echo "Unknown flag: $1" >&2; echo >&2; usage >&2; exit 1 ;;
+    esac
+done
+
+# --- Resolve repo namespace (same rules as sibling plugins) ---
+if [[ -n "$REPO_OVERRIDE" ]]; then
+    REPO="$REPO_OVERRIDE"
+elif [[ -n "${TK_REPO:-}" ]]; then
+    REPO="$TK_REPO"
+elif [[ -n "${TICKETS_DIR:-}" ]]; then
+    REPO=$(basename "$(dirname "$(cd "$TICKETS_DIR" 2>/dev/null && pwd)")")
+else
+    REPO=$(basename "$PWD")
+fi
+
+STREAM_KEY="tk:${REPO}:audit:claims"
+
+# --- Resolve --since to epoch seconds (floor for ts filter) ---
+SINCE_EPOCH=""
+if [[ -n "$SINCE" ]]; then
+    if [[ "$SINCE" =~ ^[0-9]+$ ]]; then
+        SINCE_EPOCH="$SINCE"
+    else
+        # Try BSD then GNU date
+        if SINCE_EPOCH=$(date -j -f "%Y-%m-%dT%H:%M:%SZ" "$SINCE" +%s 2>/dev/null); then
+            :
+        elif SINCE_EPOCH=$(date -d "$SINCE" +%s 2>/dev/null); then
+            :
+        else
+            echo "Error: cannot parse --since value: $SINCE" >&2
+            exit 1
+        fi
+    fi
+fi
+
+redis() {
+    redis-cli -h "${REDIS_HOST:-localhost}" -p "${REDIS_PORT:-6379}" \
+        -a "${REDIS_PASSWORD:-}" "$@" 2>/dev/null
+}
+
+# Probe Redis reachability up-front so we exit with a clear message rather
+# than print empty output.
+if ! redis PING >/dev/null; then
+    echo "Error: Redis unreachable at ${REDIS_HOST:-localhost}:${REDIS_PORT:-6379}" >&2
+    exit 1
+fi
+
+# --- ISO timestamp formatter for the ts column ---
+fmt_relative() {
+    local ts="$1" now diff
+    now=$(date -u +%s)
+    # ts may be ISO-8601 or epoch — try both
+    if [[ "$ts" =~ ^[0-9]+$ ]]; then
+        diff=$((now - ts))
+    else
+        local ts_epoch
+        if ts_epoch=$(date -j -f "%Y-%m-%dT%H:%M:%SZ" "$ts" +%s 2>/dev/null); then
+            diff=$((now - ts_epoch))
+        elif ts_epoch=$(date -d "$ts" +%s 2>/dev/null); then
+            diff=$((now - ts_epoch))
+        else
+            echo "$ts"; return
+        fi
+    fi
+    if   (( diff < 60 ));    then echo "${diff}s ago"
+    elif (( diff < 3600 ));  then echo "$((diff / 60))m ago"
+    elif (( diff < 86400 )); then echo "$((diff / 3600))h ago"
+    else echo "$((diff / 86400))d ago"
+    fi
+}
+
+# Parse a block of XREVRANGE/XREAD output lines starting at a given offset
+# and emit one line per entry (tab-separated: id\tjson-fields). Reads stdin.
+# Format of a stream entry in plaintext redis-cli output:
+#   <entry-id>
+#   <field1>
+#   <value1>
+#   <field2>
+#   <value2>
+#   ...
+#   <blank>   (separator between entries)
+# The exact blank-line behavior depends on redis-cli version, so we key off
+# the "-<digits>" entry-id pattern instead.
+
+to_tsv() {
+    awk '
+    BEGIN { id = ""; printed = 0 }
+    # Entry ID line: "<epoch-ms>-<seq>"
+    /^[0-9]+-[0-9]+$/ {
+        if (id != "") { flush() }
+        id = $0
+        delete kv
+        field = ""
+        next
+    }
+    # Skip blanks and chatter
+    /^$/ { next }
+    {
+        if (field == "") { field = $0 } else { kv[field] = $0; field = "" }
+    }
+    END { if (id != "") flush() }
+    function flush(   k, sep, json) {
+        json = "{"
+        sep = ""
+        for (k in kv) {
+            gsub(/\\/, "\\\\", kv[k])
+            gsub(/"/,  "\\\"", kv[k])
+            json = json sep "\"" k "\":\"" kv[k] "\""
+            sep = ","
+        }
+        json = json "}"
+        print id "\t" json
+        printed++
+        id = ""
+    }
+    '
+}
+
+# Apply filters + render a single TSV line. Outputs either a JSON object
+# (in --json mode) or a formatted pretty row.
+render_entry() {
+    local id="$1" json="$2"
+    local event ticket agent path ts session
+
+    # Extract fields — tolerate missing ones.
+    event=$(echo "$json"   | python3 -c 'import sys,json; d=json.load(sys.stdin); print(d.get("event",""))' 2>/dev/null)
+    ticket=$(echo "$json"  | python3 -c 'import sys,json; d=json.load(sys.stdin); print(d.get("ticket",""))' 2>/dev/null)
+    agent=$(echo "$json"   | python3 -c 'import sys,json; d=json.load(sys.stdin); print(d.get("agent",""))' 2>/dev/null)
+    path=$(echo "$json"    | python3 -c 'import sys,json; d=json.load(sys.stdin); print(d.get("path",""))' 2>/dev/null)
+    ts=$(echo "$json"      | python3 -c 'import sys,json; d=json.load(sys.stdin); print(d.get("ts",""))' 2>/dev/null)
+    session=$(echo "$json" | python3 -c 'import sys,json; d=json.load(sys.stdin); print(d.get("session",""))' 2>/dev/null)
+
+    # Filters
+    [[ -n "$FILTER_TICKET" && "$ticket" != "$FILTER_TICKET" ]] && return 1
+    if [[ -n "$FILTER_EVENT" && "$FILTER_EVENT" != "all" && "$event" != "$FILTER_EVENT" ]]; then return 1; fi
+    [[ -n "$FILTER_PATH"   && "$path" != *"$FILTER_PATH"* ]] && return 1
+
+    if [[ -n "$SINCE_EPOCH" ]]; then
+        local ts_epoch
+        if [[ "$ts" =~ ^[0-9]+$ ]]; then
+            ts_epoch="$ts"
+        else
+            ts_epoch=$(date -j -f "%Y-%m-%dT%H:%M:%SZ" "$ts" +%s 2>/dev/null || date -d "$ts" +%s 2>/dev/null || echo 0)
+        fi
+        (( ts_epoch < SINCE_EPOCH )) && return 1
+    fi
+
+    if (( JSON == 1 )); then
+        python3 -c '
+import sys, json
+d = json.loads(sys.argv[1])
+d["_stream_id"] = sys.argv[2]
+print(json.dumps(d))
+' "$json" "$id"
+    else
+        local rel
+        rel=$(fmt_relative "$ts")
+        printf '%-12s  %-16s  %-10s  %-14s  %s\n' "$rel" "$event" "$ticket" "$agent" "$path"
+    fi
+    return 0
+}
+
+render_header() {
+    (( JSON == 1 )) && return
+    printf '%-12s  %-16s  %-10s  %-14s  %s\n' "WHEN" "EVENT" "TICKET" "AGENT" "PATH"
+    printf '%-12s  %-16s  %-10s  %-14s  %s\n' "----" "-----" "------" "-----" "----"
+}
+
+# --- Tail mode: blocking XREAD ---
+if (( TAIL == 1 )); then
+    # Start from the newest ID; $ means "only entries added after this call returns"
+    LAST_ID='$'
+    render_header
+    while true; do
+        OUT=$(redis XREAD BLOCK 0 COUNT 10 STREAMS "$STREAM_KEY" "$LAST_ID")
+        RC=$?
+        if (( RC != 0 )); then
+            echo "Error: Redis error during XREAD (rc=$RC)" >&2
+            exit 1
+        fi
+        [[ -z "$OUT" ]] && continue
+
+        # XREAD output has a leading stream-key line; strip it and parse the rest.
+        # Easier: extract just the entry section via awk.
+        ENTRIES=$(echo "$OUT" | awk '
+            BEGIN { in_entries = 0 }
+            # The stream key appears first; once we see an entry-id we are in entries
+            /^[0-9]+-[0-9]+$/ { in_entries = 1 }
+            in_entries { print }
+        ')
+
+        LAST_SEEN=""
+        while IFS=$'\t' read -r id json; do
+            [[ -z "$id" ]] && continue
+            LAST_SEEN="$id"
+            render_entry "$id" "$json" || true
+        done < <(echo "$ENTRIES" | to_tsv)
+
+        [[ -n "$LAST_SEEN" ]] && LAST_ID="$LAST_SEEN"
+    done
+fi
+
+# --- Batch mode: XREVRANGE newest-first, then filter + render ---
+RAW=$(redis XREVRANGE "$STREAM_KEY" + - COUNT "$COUNT")
+RC=$?
+if (( RC != 0 )); then
+    echo "Error: Redis error during XREVRANGE (rc=$RC)" >&2
+    exit 1
+fi
+
+if [[ -z "$RAW" ]]; then
+    if (( JSON == 1 )); then echo "[]"; else echo "(no audit entries found in $STREAM_KEY)" >&2; fi
+    exit 0
+fi
+
+TSV=$(echo "$RAW" | to_tsv)
+
+if (( JSON == 1 )); then
+    # Render each entry as JSON, comma-join as an array.
+    FIRST=1
+    echo -n "["
+    while IFS=$'\t' read -r id json; do
+        [[ -z "$id" ]] && continue
+        LINE=$(render_entry "$id" "$json") || continue
+        if (( FIRST == 1 )); then FIRST=0; else echo -n ","; fi
+        echo -n "$LINE"
+    done <<< "$TSV"
+    echo "]"
+else
+    render_header
+    while IFS=$'\t' read -r id json; do
+        [[ -z "$id" ]] && continue
+        render_entry "$id" "$json" || true
+    done <<< "$TSV"
+fi
+exit 0
