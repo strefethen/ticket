@@ -1,0 +1,214 @@
+#!/usr/bin/env bash
+# tk-plugin: Validate tickets against the handoff schema
+# tk-plugin-version: 0.1.0
+#
+# Usage:
+#   tk lint <id>           Check one ticket, pretty output, exit 0 pass / 1 fail
+#   tk lint --all          Check every ticket in TICKETS_DIR
+#   tk lint <id> --json    Emit JSON result
+#   tk lint --all --json   Emit JSON array
+#
+# Required for plan-ready handoff:
+#   frontmatter: writes (non-empty), plan (set)
+#   body:        ## Design (non-empty), ## Acceptance Criteria (non-empty)
+#   reads:       present but may be empty (warn)
+#   type/priority are NOT gated in v1 — default values can't be distinguished
+#   from explicit ones without parsing create-time arg history.
+
+set -u
+
+JSON=0
+ALL=0
+TICKET_ID=""
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --json) JSON=1; shift ;;
+        --all)  ALL=1;  shift ;;
+        -h|--help)
+            cat <<'EOF'
+tk lint — validate tickets against the handoff schema.
+
+Usage:
+  tk lint <id>            Check one ticket
+  tk lint --all           Check every ticket in $TICKETS_DIR
+  tk lint <id> --json     Emit JSON {ticket_id, overall, checks: [...]}
+  tk lint --all --json    Emit JSON array of same shape
+
+Exit codes:
+  0   all lints pass
+  1   one or more lints fail
+EOF
+            exit 0
+            ;;
+        -*) echo "Unknown flag: $1" >&2; exit 1 ;;
+        *)  TICKET_ID="$1"; shift ;;
+    esac
+done
+
+TICKETS_DIR="${TICKETS_DIR:-.tickets}"
+if [[ ! -d "$TICKETS_DIR" ]]; then
+    echo "Error: $TICKETS_DIR does not exist" >&2
+    exit 1
+fi
+
+# Extract lint signals from a single file via awk.
+# Output format (pipe-separated, one line):
+#   writes_count|reads_count|plan|design_lines|acceptance_lines|type|priority|id
+extract_signals() {
+    awk '
+    BEGIN {
+        in_fm = 0; in_writes = 0; in_reads = 0;
+        writes_count = 0; reads_count = 0;
+        plan = ""; type_ = ""; priority_ = ""; id_ = "";
+        design_section = 0; design_lines = 0;
+        acceptance_section = 0; acceptance_lines = 0;
+    }
+    /^---$/ {
+        if (NR == 1) { in_fm = 1; next }
+        else if (in_fm) { in_fm = 0; next }
+    }
+    in_fm {
+        if ($1 == "id:") { id_ = $2 }
+        else if ($1 == "plan:") { plan = $2 }
+        else if ($1 == "type:") { type_ = $2 }
+        else if ($1 == "priority:") { priority_ = $2 }
+        else if (/^writes:/) { in_writes = 1; in_reads = 0; next }
+        else if (/^reads:/)  { in_reads = 1;  in_writes = 0; next }
+        if (/^  - /) {
+            if (in_writes) writes_count++
+            else if (in_reads) reads_count++
+            next
+        }
+        if (/^[a-z]/) { in_writes = 0; in_reads = 0 }
+    }
+    !in_fm {
+        if (/^## Design$/)              { design_section = 1;     acceptance_section = 0; next }
+        if (/^## Acceptance Criteria$/) { acceptance_section = 1; design_section = 0;     next }
+        if (/^## /)                     { design_section = 0;     acceptance_section = 0        }
+        if (design_section && $0 ~ /[^[:space:]]/)     design_lines++
+        if (acceptance_section && $0 ~ /[^[:space:]]/) acceptance_lines++
+    }
+    END {
+        print writes_count "|" reads_count "|" plan "|" design_lines "|" acceptance_lines "|" type_ "|" priority_ "|" id_
+    }
+    ' "$1"
+}
+
+# Lint one file. Emits result to stdout in requested format; returns 0 or 1.
+lint_one() {
+    local file="$1"
+    local signals
+    signals=$(extract_signals "$file")
+    IFS='|' read -r writes_count reads_count plan design_lines acceptance_lines type_ priority_ id_ <<< "$signals"
+    [[ -z "$id_" ]] && id_=$(basename "$file" .md)
+
+    # Evaluate checks. Each is (name|status|detail).
+    local -a checks=()
+    local overall="pass"
+
+    if (( writes_count > 0 )); then
+        checks+=("writes|pass|$writes_count path(s)")
+    else
+        checks+=("writes|fail|empty or missing")
+        overall="fail"
+    fi
+
+    if (( reads_count > 0 )); then
+        checks+=("reads|pass|$reads_count path(s)")
+    else
+        checks+=("reads|warn|absent or empty")
+    fi
+
+    if [[ -n "$plan" ]]; then
+        checks+=("plan|pass|$plan")
+    else
+        checks+=("plan|fail|not set")
+        overall="fail"
+    fi
+
+    if (( design_lines > 0 )); then
+        checks+=("design|pass|$design_lines line(s)")
+    else
+        checks+=("design|fail|## Design section missing or empty")
+        overall="fail"
+    fi
+
+    if (( acceptance_lines > 0 )); then
+        checks+=("acceptance|pass|$acceptance_lines line(s)")
+    else
+        checks+=("acceptance|fail|## Acceptance Criteria missing or empty")
+        overall="fail"
+    fi
+
+    if (( JSON == 1 )); then
+        # Build JSON via jq from the check triples.
+        {
+            printf '%s\n' "${checks[@]}"
+        } | jq -Rn --arg id "$id_" --arg overall "$overall" '
+            [inputs | split("|") | {rule: .[0], status: .[1], detail: .[2]}]
+            | {ticket_id: $id, overall: $overall, checks: .}
+        '
+    else
+        # Pretty output.
+        echo "$id_  ${overall^^}"
+        for c in "${checks[@]}"; do
+            IFS='|' read -r rule status detail <<< "$c"
+            local marker
+            case "$status" in
+                pass) marker="[x]" ;;
+                warn) marker="[~]" ;;
+                *)    marker="[ ]" ;;
+            esac
+            printf '  %s %-11s %s\n' "$marker" "$rule" "$detail"
+        done
+    fi
+
+    [[ "$overall" == "pass" ]] && return 0 || return 1
+}
+
+# Main dispatch
+if (( ALL == 1 )); then
+    fail_count=0
+    pass_count=0
+    first=1
+    if (( JSON == 1 )); then echo "["; fi
+    for f in "$TICKETS_DIR"/*.md; do
+        bn=$(basename "$f")
+        case "$bn" in _*|index.md|_sidebar.json|closed-tickets.md) continue ;; esac
+
+        if (( JSON == 1 )); then
+            [[ $first -eq 0 ]] && echo ","
+            first=0
+            if lint_one "$f"; then
+                pass_count=$((pass_count + 1))
+            else
+                fail_count=$((fail_count + 1))
+            fi
+        else
+            if lint_one "$f"; then
+                pass_count=$((pass_count + 1))
+            else
+                fail_count=$((fail_count + 1))
+            fi
+            echo
+        fi
+    done
+    if (( JSON == 1 )); then echo "]"; fi
+    if (( JSON == 0 )); then
+        echo "summary: $pass_count pass, $fail_count fail"
+    fi
+    (( fail_count == 0 )) && exit 0 || exit 1
+else
+    if [[ -z "$TICKET_ID" ]]; then
+        echo "Usage: tk lint <id>  |  tk lint --all" >&2
+        exit 1
+    fi
+    # Resolve ticket file path
+    file="$TICKETS_DIR/${TICKET_ID}.md"
+    if [[ ! -f "$file" ]]; then
+        echo "Error: ticket $TICKET_ID not found at $file" >&2
+        exit 1
+    fi
+    lint_one "$file"
+fi
