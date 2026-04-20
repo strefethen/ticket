@@ -163,6 +163,7 @@ cmd_create() {
 
     local title="" description="" design="" acceptance=""
     local priority=2 issue_type="task" assignee="" external_ref="" parent="" tags=""
+    local plan="" writes="" reads="" supersedes=""
 
     # Default assignee to git user.name if available
     assignee=$(git config user.name 2>/dev/null || true)
@@ -179,6 +180,10 @@ cmd_create() {
             --external-ref) external_ref="$2"; shift 2 ;;
             --parent) parent="$2"; shift 2 ;;
             --tags) tags="$2"; shift 2 ;;
+            --plan) plan="$2"; shift 2 ;;
+            --writes) writes="$2"; shift 2 ;;
+            --reads) reads="$2"; shift 2 ;;
+            --supersedes) supersedes="$2"; shift 2 ;;
             -*) echo "Unknown option: $1" >&2; return 1 ;;
             *) title="$1"; shift ;;
         esac
@@ -212,6 +217,26 @@ cmd_create() {
         [[ -n "$parent" ]] && echo "parent: $parent"
         if [[ -n "$tags" ]]; then
             echo "tags: [${tags//,/, }]"
+        fi
+        [[ -n "$plan" ]] && echo "plan: $plan"
+        if [[ -n "$writes" ]]; then
+            echo "writes:"
+            IFS=',' read -ra _fr_writes <<< "$writes"
+            for _fr_w in "${_fr_writes[@]}"; do
+                _fr_w="${_fr_w# }"; _fr_w="${_fr_w% }"
+                echo "  - $_fr_w"
+            done
+        fi
+        if [[ -n "$reads" ]]; then
+            echo "reads:"
+            IFS=',' read -ra _fr_reads <<< "$reads"
+            for _fr_r in "${_fr_reads[@]}"; do
+                _fr_r="${_fr_r# }"; _fr_r="${_fr_r% }"
+                echo "  - $_fr_r"
+            done
+        fi
+        if [[ -n "$supersedes" ]]; then
+            echo "supersedes: [${supersedes//,/, }]"
         fi
         echo "---"
         echo "# $title"
@@ -1280,6 +1305,10 @@ Commands:
     --external-ref         External reference (e.g., gh-123, JIRA-456)
     --parent               Parent ticket ID
     --tags                 Comma-separated tags (e.g., --tags ui,backend,urgent)
+    --plan                 Relative path to a planning .md file (traceability)
+    --writes               Comma-separated paths the agent will edit (block sequence)
+    --reads                Comma-separated paths the agent will read for context
+    --supersedes           Comma-separated ticket ids this ticket replaces
   start <id>               Set status to in_progress
   close <id>               Set status to closed
   reopen <id>              Set status to open
