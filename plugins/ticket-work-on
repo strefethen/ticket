@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+# tk-plugin: Set the active ticket for this repo (writes .tickets/.current)
+# tk-plugin-version: 0.1.0
+#
+# Usage: tk work-on <ticket-id>
+#
+# Transitions <ticket-id> to in_progress and writes .tickets/.current so the
+# Claude Code claim hooks know which ticket this session's edits belong to
+# without requiring TK_TICKET_ID in the environment.
+#
+# Resolution order used by the hooks:
+#   1. $TK_TICKET_ID (explicit env var)
+#   2. .tickets/.current in cwd or any ancestor (this file)
+#   3. No active ticket — hooks are no-ops
+
+set -u
+
+if [[ $# -lt 1 ]]; then
+    echo "Usage: tk work-on <ticket-id>" >&2
+    exit 1
+fi
+
+TICKET="$1"
+TICKETS_DIR="${TICKETS_DIR:-.tickets}"
+
+if [[ ! -d "$TICKETS_DIR" ]]; then
+    echo "Error: $TICKETS_DIR does not exist (run from a repo with tk initialized)" >&2
+    exit 1
+fi
+
+# Partial-id matching: let tk resolve the prefix so "tk work-on 4v5j" works.
+FILE=$("$TK_SCRIPT" super show "$TICKET" --path 2>/dev/null) || FILE=""
+if [[ -z "$FILE" || ! -f "$FILE" ]]; then
+    # Fall back to direct .md check
+    if [[ -f "$TICKETS_DIR/${TICKET}.md" ]]; then
+        FILE="$TICKETS_DIR/${TICKET}.md"
+    else
+        # Prefix match against .tickets/*.md
+        MATCHES=("$TICKETS_DIR"/*"${TICKET}"*.md)
+        if [[ ${#MATCHES[@]} -eq 1 && -f "${MATCHES[0]}" ]]; then
+            FILE="${MATCHES[0]}"
+        elif [[ ${#MATCHES[@]} -gt 1 ]]; then
+            echo "Error: ambiguous ticket id '$TICKET' — multiple matches:" >&2
+            printf '  %s\n' "${MATCHES[@]##*/}" >&2
+            exit 1
+        else
+            echo "Error: no ticket matching '$TICKET' in $TICKETS_DIR" >&2
+            exit 1
+        fi
+    fi
+fi
+
+# Resolve to the canonical id from the file name.
+CANONICAL=$(basename "$FILE" .md)
+
+# Transition to in_progress (best-effort — ignore failure if already there).
+"$TK_SCRIPT" super status "$CANONICAL" in_progress >/dev/null 2>&1 || true
+
+# Write the marker.
+echo "$CANONICAL" > "$TICKETS_DIR/.current"
+echo "working on $CANONICAL (file: $TICKETS_DIR/.current)"
+exit 0

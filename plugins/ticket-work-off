@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# tk-plugin: Clear the active ticket for this repo (removes .tickets/.current)
+# tk-plugin-version: 0.1.0
+#
+# Usage: tk work-off
+#
+# Removes the .tickets/.current marker so subsequent edits don't get
+# attributed to any ticket. Does NOT change the ticket's status — use
+# tk close / tk status for that.
+
+set -u
+
+TICKETS_DIR="${TICKETS_DIR:-.tickets}"
+
+if [[ ! -d "$TICKETS_DIR" ]]; then
+    echo "Error: $TICKETS_DIR does not exist" >&2
+    exit 1
+fi
+
+MARKER="$TICKETS_DIR/.current"
+
+if [[ -f "$MARKER" ]]; then
+    WAS=$(<"$MARKER")
+    rm -f "$MARKER"
+    echo "stopped working on $WAS"
+else
+    echo "(no active ticket)"
+fi
+exit 0
