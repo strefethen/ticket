@@ -1,0 +1,109 @@
+#!/usr/bin/env bash
+# tk-plugin: Release a write claim on a file path
+# tk-plugin-version: 0.1.0
+#
+# Usage: tk release <ticket-id> <abs-path>
+#
+# Idempotent: already-released or never-claimed paths succeed silently.
+# Exit 0 on success (whether the claim existed or not), exit 1 on Redis error,
+# exit 2 only if the claim is held by a DIFFERENT ticket (safety — we refuse
+# to release someone else's claim).
+
+if [[ $# -lt 2 ]]; then
+    echo "Usage: tk release <ticket-id> <path>" >&2
+    exit 1
+fi
+
+TICKET="$1"
+RAW_PATH="$2"
+
+if [[ "$RAW_PATH" = /* ]]; then
+    ABS_PATH="$RAW_PATH"
+else
+    parent_dir="$(cd "$(dirname "$RAW_PATH")" 2>/dev/null && pwd)"
+    if [[ -z "$parent_dir" ]]; then
+        echo "Error: cannot resolve parent directory for: $RAW_PATH" >&2
+        exit 1
+    fi
+    ABS_PATH="$parent_dir/$(basename "$RAW_PATH")"
+fi
+
+if [[ -n "${TK_REPO:-}" ]]; then
+    REPO="$TK_REPO"
+elif [[ -n "${TICKETS_DIR:-}" ]]; then
+    REPO=$(basename "$(dirname "$(cd "$TICKETS_DIR" 2>/dev/null && pwd)")")
+else
+    REPO=$(basename "$PWD")
+fi
+
+AGENT="${TK_AGENT_ID:-unknown}"
+NOW=$(date -u +%s)
+
+redis() {
+    redis-cli -h "${REDIS_HOST:-localhost}" -p "${REDIS_PORT:-6379}" \
+        -a "${REDIS_PASSWORD:-}" "$@" 2>/dev/null
+}
+
+CLAIM_KEY="tk:${REPO}:claim:write:${ABS_PATH}"
+IDX_KEY="tk:${REPO}:ticket-claims:${TICKET}"
+STREAM_KEY="tk:${REPO}:audit:claims"
+
+# Atomic: GET → if-ours → DEL + SREM + XADD
+LUA='
+local key = KEYS[1]
+local idx = KEYS[2]
+local stream = KEYS[3]
+local path = ARGV[1]
+local ticket = ARGV[2]
+local agent = ARGV[3]
+local ts = ARGV[4]
+
+local existing = redis.call("GET", key)
+if existing then
+    local ok, existing_data = pcall(cjson.decode, existing)
+    if ok and existing_data.ticket_id == ticket then
+        redis.call("DEL", key)
+        redis.call("SREM", idx, path)
+        redis.call("XADD", stream, "*",
+            "event", "release",
+            "ticket", ticket,
+            "agent", agent,
+            "path", path,
+            "ts", ts)
+        return "released"
+    else
+        return "held-by-other"
+    end
+end
+-- Already released or never held — idempotent success; still clean up stale index entry.
+redis.call("SREM", idx, path)
+return "not-held"
+'
+
+RESULT=$(redis EVAL "$LUA" 3 "$CLAIM_KEY" "$IDX_KEY" "$STREAM_KEY" \
+    "$ABS_PATH" "$TICKET" "$AGENT" "$NOW")
+RC=$?
+
+if [[ $RC -ne 0 ]]; then
+    echo "Error: Redis unreachable (exit $RC)" >&2
+    exit 1
+fi
+
+case "$RESULT" in
+    released)
+        echo "released: $ABS_PATH"
+        exit 0
+        ;;
+    not-held)
+        # Idempotent — nothing to do. Silent success is friendly for Stop hook bulk release.
+        exit 0
+        ;;
+    held-by-other)
+        echo "Warning: $ABS_PATH is held by a different ticket; not releasing." >&2
+        exit 2
+        ;;
+    *)
+        echo "Error: unexpected response from Redis: $RESULT" >&2
+        exit 1
+        ;;
+esac

@@ -1,0 +1,133 @@
+#!/usr/bin/env bash
+# tk-plugin: Acquire a write claim on a file path via Redis
+# tk-plugin-version: 0.1.0
+#
+# Usage: tk claim <ticket-id> <abs-path>
+#
+# Exit codes:
+#   0 — claim acquired, or heartbeat (same ticket re-issuing)
+#   1 — Redis unreachable, invalid args, or other infra error
+#   2 — claim held by another ticket (blocking conflict)
+#
+# Env:
+#   REDIS_HOST, REDIS_PORT (default 6379), REDIS_PASSWORD — connection (required)
+#   TK_AGENT_ID — agent identifier recorded on the claim (default "unknown")
+#   TK_REPO     — override repo namespace (default: derived from TICKETS_DIR parent)
+#
+# Keys written:
+#   tk:<repo>:claim:write:<abs-path>          — the claim
+#   tk:<repo>:ticket-claims:<ticket-id>       — per-ticket index Set (SADD)
+#   tk:<repo>:audit:claims                    — append-only stream (XADD)
+#
+# NOTE: This script follows the Redis discipline in root CLAUDE.md — no
+# wildcard scans, no whole-DB ops. Claim enumeration goes through SMEMBERS
+# on the per-ticket index Set elsewhere.
+
+if [[ $# -lt 2 ]]; then
+    echo "Usage: tk claim <ticket-id> <path>" >&2
+    exit 1
+fi
+
+TICKET="$1"
+RAW_PATH="$2"
+
+if [[ "$RAW_PATH" = /* ]]; then
+    ABS_PATH="$RAW_PATH"
+else
+    parent_dir="$(cd "$(dirname "$RAW_PATH")" 2>/dev/null && pwd)"
+    if [[ -z "$parent_dir" ]]; then
+        echo "Error: cannot resolve parent directory for: $RAW_PATH" >&2
+        exit 1
+    fi
+    ABS_PATH="$parent_dir/$(basename "$RAW_PATH")"
+fi
+
+if [[ -n "${TK_REPO:-}" ]]; then
+    REPO="$TK_REPO"
+elif [[ -n "${TICKETS_DIR:-}" ]]; then
+    REPO=$(basename "$(dirname "$(cd "$TICKETS_DIR" 2>/dev/null && pwd)")")
+else
+    REPO=$(basename "$PWD")
+fi
+
+AGENT="${TK_AGENT_ID:-unknown}"
+NOW=$(date -u +%s)
+TTL=300
+
+redis() {
+    redis-cli -h "${REDIS_HOST:-localhost}" -p "${REDIS_PORT:-6379}" \
+        -a "${REDIS_PASSWORD:-}" "$@" 2>/dev/null
+}
+
+CLAIM_KEY="tk:${REPO}:claim:write:${ABS_PATH}"
+IDX_KEY="tk:${REPO}:ticket-claims:${TICKET}"
+STREAM_KEY="tk:${REPO}:audit:claims"
+
+VALUE=$(jq -cn \
+    --arg t "$TICKET" --arg a "$AGENT" --argjson ts "$NOW" \
+    '{ticket_id:$t, agent_id:$a, acquired_at:$ts, heartbeat_at:$ts}')
+
+# Atomic acquire-or-heartbeat via EVAL. Redis runs Lua scripts atomically,
+# so SET/SADD/XADD cannot interleave with another agent's acquire.
+LUA='
+local key = KEYS[1]
+local idx = KEYS[2]
+local stream = KEYS[3]
+local new_value = ARGV[1]
+local path = ARGV[2]
+local ttl = tonumber(ARGV[3])
+local ticket = ARGV[4]
+local agent = ARGV[5]
+local ts = ARGV[6]
+
+local existing = redis.call("GET", key)
+if existing then
+    local ok, existing_data = pcall(cjson.decode, existing)
+    if ok and existing_data.ticket_id == ticket then
+        existing_data.heartbeat_at = tonumber(ts)
+        redis.call("SET", key, cjson.encode(existing_data), "EX", ttl)
+        return "heartbeat"
+    else
+        return existing
+    end
+else
+    redis.call("SET", key, new_value, "EX", ttl)
+    redis.call("SADD", idx, path)
+    redis.call("XADD", stream, "*",
+        "event", "acquire",
+        "ticket", ticket,
+        "agent", agent,
+        "path", path,
+        "ts", ts)
+    return "acquired"
+end
+'
+
+RESULT=$(redis EVAL "$LUA" 3 "$CLAIM_KEY" "$IDX_KEY" "$STREAM_KEY" \
+    "$VALUE" "$ABS_PATH" "$TTL" "$TICKET" "$AGENT" "$NOW")
+RC=$?
+
+if [[ $RC -ne 0 ]]; then
+    echo "Error: Redis unreachable (exit $RC)" >&2
+    exit 1
+fi
+
+case "$RESULT" in
+    acquired)
+        echo "claimed: $ABS_PATH"
+        exit 0
+        ;;
+    heartbeat)
+        echo "refreshed: $ABS_PATH"
+        exit 0
+        ;;
+    "")
+        echo "Error: empty response from Redis (likely auth or connectivity)" >&2
+        exit 1
+        ;;
+    *)
+        echo "BLOCKED: $ABS_PATH already claimed by another ticket:" >&2
+        echo "$RESULT" >&2
+        exit 2
+        ;;
+esac

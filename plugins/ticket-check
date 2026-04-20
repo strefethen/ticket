@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+# tk-plugin: Check who holds the claim on a file path (if anyone)
+# tk-plugin-version: 0.1.0
+#
+# Usage: tk check <abs-path>
+#
+# Output:
+#   On claim exists:  the JSON value on stdout, exit 0
+#   On unclaimed:     "unclaimed" on stdout, exit 0
+#   On Redis error:   exit 1
+
+if [[ $# -lt 1 ]]; then
+    echo "Usage: tk check <path>" >&2
+    exit 1
+fi
+
+RAW_PATH="$1"
+
+if [[ "$RAW_PATH" = /* ]]; then
+    ABS_PATH="$RAW_PATH"
+else
+    parent_dir="$(cd "$(dirname "$RAW_PATH")" 2>/dev/null && pwd)"
+    if [[ -z "$parent_dir" ]]; then
+        echo "Error: cannot resolve parent directory for: $RAW_PATH" >&2
+        exit 1
+    fi
+    ABS_PATH="$parent_dir/$(basename "$RAW_PATH")"
+fi
+
+if [[ -n "${TK_REPO:-}" ]]; then
+    REPO="$TK_REPO"
+elif [[ -n "${TICKETS_DIR:-}" ]]; then
+    REPO=$(basename "$(dirname "$(cd "$TICKETS_DIR" 2>/dev/null && pwd)")")
+else
+    REPO=$(basename "$PWD")
+fi
+
+redis() {
+    redis-cli -h "${REDIS_HOST:-localhost}" -p "${REDIS_PORT:-6379}" \
+        -a "${REDIS_PASSWORD:-}" "$@" 2>/dev/null
+}
+
+CLAIM_KEY="tk:${REPO}:claim:write:${ABS_PATH}"
+
+RESULT=$(redis GET "$CLAIM_KEY")
+RC=$?
+
+if [[ $RC -ne 0 ]]; then
+    echo "Error: Redis unreachable (exit $RC)" >&2
+    exit 1
+fi
+
+if [[ -z "$RESULT" ]]; then
+    echo "unclaimed"
+else
+    echo "$RESULT"
+fi
+exit 0
