@@ -525,6 +525,14 @@ def step_ticket_contains(context, ticket_id, text):
     assert text in content, f"Ticket does not contain '{text}'\nContent: {content}"
 
 
+@then(r'ticket "(?P<ticket_id>[^"]+)" should not contain "(?P<text>[^"]+)"')
+def step_ticket_not_contains(context, ticket_id, text):
+    """Assert ticket file does not contain text."""
+    ticket_path = Path(context.test_dir) / '.tickets' / f'{ticket_id}.md'
+    content = ticket_path.read_text()
+    assert text not in content, f"Ticket unexpectedly contains '{text}'\nContent: {content}"
+
+
 @then(r'ticket "(?P<ticket_id>[^"]+)" should contain a timestamp in notes')
 def step_ticket_has_timestamp_in_notes(context, ticket_id):
     """Assert ticket has a timestamp in notes section."""

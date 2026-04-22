@@ -9,6 +9,7 @@
 - `deferred` status value for parking tickets that are valid but not being worked on now. Distinct from `closed` (done) — preserves the "valid work, not done" signal
 - `defer <id>` command to set a ticket's status to `deferred` (mirrors `close`)
 - `ready` and `blocked` exclude deferred tickets automatically (both use allowlist filter for open/in_progress); `reopen` restores a deferred ticket to open
+- `-r, --reason <text>` flag on `status`, `start`, `close`, `defer`, and `reopen`. Appends a timestamped note to the ticket's `## Notes` section with a transition label (`Closed:`, `Deferred:`, `Reopened:`, `Started:`). Multiple transitions preserve full history
 - Plugin system: executables named `tk-<cmd>` or `ticket-<cmd>` in PATH are invoked automatically
 - `super` command to bypass plugins and run built-in commands directly
 - `TICKETS_DIR` and `TK_SCRIPT` environment variables exported for plugins

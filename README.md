@@ -67,11 +67,11 @@ Commands:
     --external-ref         External reference (e.g., gh-123, JIRA-456)
     --parent               Parent ticket ID
     --tags                 Comma-separated tags (e.g., --tags ui,backend,urgent)
-  start <id>               Set status to in_progress
-  close <id>               Set status to closed
-  defer <id>               Set status to deferred
-  reopen <id>              Set status to open
-  status <id> <status>     Update status (open|in_progress|closed|deferred)
+  start <id> [-r reason]   Set status to in_progress (optional reason note)
+  close <id> [-r reason]   Set status to closed (optional reason note)
+  defer <id> [-r reason]   Set status to deferred (optional reason note)
+  reopen <id> [-r reason]  Set status to open (optional reason note)
+  status <id> <status> [-r reason]  Update status (open|in_progress|closed|deferred)
   dep <id> <dep-id>        Add dependency (id depends on dep-id)
   dep tree [--full] <id>   Show dependency tree (--full disables dedup)
   dep cycle                Find dependency cycles in open tickets

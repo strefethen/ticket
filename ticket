@@ -274,15 +274,61 @@ validate_status() {
     return 1
 }
 
+# Append a status-transition note to a ticket. Reuses the same
+# ## Notes format as cmd_add_note, but prefixes the reason with a
+# label derived from the new status so later scanning reveals what
+# happened, not just why.
+_append_status_note() {
+    local file="$1"
+    local status="$2"
+    local reason="$3"
+
+    local label
+    case "$status" in
+        closed)      label="Closed" ;;
+        deferred)    label="Deferred" ;;
+        open)        label="Reopened" ;;
+        in_progress) label="Started" ;;
+        *)           label="Status -> $status" ;;
+    esac
+
+    local timestamp
+    timestamp=$(_iso_date)
+
+    if ! grep -q '^## Notes' "$file"; then
+        printf '\n## Notes\n' >> "$file"
+    fi
+    printf '\n**%s**\n\n%s: %s\n' "$timestamp" "$label" "$reason" >> "$file"
+}
+
 cmd_status() {
-    if [[ $# -lt 2 ]]; then
-        echo "Usage: $(basename "$0") status <id> <status>" >&2
+    local reason=""
+    local positional=()
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -r|--reason)
+                if [[ $# -lt 2 ]]; then
+                    echo "Error: $1 requires a reason argument" >&2
+                    return 1
+                fi
+                reason="$2"
+                shift 2
+                ;;
+            *)
+                positional+=("$1")
+                shift
+                ;;
+        esac
+    done
+
+    if [[ ${#positional[@]} -lt 2 ]]; then
+        echo "Usage: $(basename "$0") status <id> <status> [-r reason]" >&2
         echo "Valid statuses: $VALID_STATUSES" >&2
         return 1
     fi
 
-    local id="$1"
-    local status="$2"
+    local id="${positional[0]}"
+    local status="${positional[1]}"
 
     validate_status "$status" || return 1
 
@@ -290,39 +336,46 @@ cmd_status() {
     file=$(ticket_path "$id") || return 1
 
     update_yaml_field "$file" "status" "$status"
+    if [[ -n "$reason" ]]; then
+        _append_status_note "$file" "$status" "$reason"
+    fi
     echo "Updated $(basename "$file" .md) -> $status"
 }
 
 cmd_start() {
     if [[ $# -lt 1 ]]; then
-        echo "Usage: $(basename "$0") start <id>" >&2
+        echo "Usage: $(basename "$0") start <id> [-r reason]" >&2
         return 1
     fi
-    cmd_status "$1" "in_progress"
+    local id="$1"; shift
+    cmd_status "$id" "in_progress" "$@"
 }
 
 cmd_close() {
     if [[ $# -lt 1 ]]; then
-        echo "Usage: $(basename "$0") close <id>" >&2
+        echo "Usage: $(basename "$0") close <id> [-r reason]" >&2
         return 1
     fi
-    cmd_status "$1" "closed"
+    local id="$1"; shift
+    cmd_status "$id" "closed" "$@"
 }
 
 cmd_defer() {
     if [[ $# -lt 1 ]]; then
-        echo "Usage: $(basename "$0") defer <id>" >&2
+        echo "Usage: $(basename "$0") defer <id> [-r reason]" >&2
         return 1
     fi
-    cmd_status "$1" "deferred"
+    local id="$1"; shift
+    cmd_status "$id" "deferred" "$@"
 }
 
 cmd_reopen() {
     if [[ $# -lt 1 ]]; then
-        echo "Usage: $(basename "$0") reopen <id>" >&2
+        echo "Usage: $(basename "$0") reopen <id> [-r reason]" >&2
         return 1
     fi
-    cmd_status "$1" "open"
+    local id="$1"; shift
+    cmd_status "$id" "open" "$@"
 }
 
 cmd_dep_tree() {
@@ -1317,11 +1370,11 @@ Commands:
     --writes               Comma-separated paths the agent will edit (block sequence)
     --reads                Comma-separated paths the agent will read for context
     --supersedes           Comma-separated ticket ids this ticket replaces
-  start <id>               Set status to in_progress
-  close <id>               Set status to closed
-  defer <id>               Set status to deferred
-  reopen <id>              Set status to open
-  status <id> <status>     Update status (open|in_progress|closed|deferred)
+  start <id> [-r reason]   Set status to in_progress (optional reason note)
+  close <id> [-r reason]   Set status to closed (optional reason note)
+  defer <id> [-r reason]   Set status to deferred (optional reason note)
+  reopen <id> [-r reason]  Set status to open (optional reason note)
+  status <id> <status> [-r reason]  Update status (open|in_progress|closed|deferred)
   dep <id> <dep-id>        Add dependency (id depends on dep-id)
   dep tree [--full] <id>   Show dependency tree (--full disables dedup)
   dep cycle                Find dependency cycles in open tickets
