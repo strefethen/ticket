@@ -263,7 +263,7 @@ cmd_create() {
 }
 
 # Valid statuses
-VALID_STATUSES="open in_progress closed"
+VALID_STATUSES="open in_progress closed deferred"
 
 validate_status() {
     local status="$1"
@@ -307,6 +307,14 @@ cmd_close() {
         return 1
     fi
     cmd_status "$1" "closed"
+}
+
+cmd_defer() {
+    if [[ $# -lt 1 ]]; then
+        echo "Usage: $(basename "$0") defer <id>" >&2
+        return 1
+    fi
+    cmd_status "$1" "deferred"
 }
 
 cmd_reopen() {
@@ -1311,8 +1319,9 @@ Commands:
     --supersedes           Comma-separated ticket ids this ticket replaces
   start <id>               Set status to in_progress
   close <id>               Set status to closed
+  defer <id>               Set status to deferred
   reopen <id>              Set status to open
-  status <id> <status>     Update status (open|in_progress|closed)
+  status <id> <status>     Update status (open|in_progress|closed|deferred)
   dep <id> <dep-id>        Add dependency (id depends on dep-id)
   dep tree [--full] <id>   Show dependency tree (--full disables dedup)
   dep cycle                Find dependency cycles in open tickets
@@ -1396,6 +1405,7 @@ case "${1:-help}" in
     create) shift; cmd_create "$@" ;;
     start)  shift; cmd_start "$@" ;;
     close)  shift; cmd_close "$@" ;;
+    defer)  shift; cmd_defer "$@" ;;
     reopen) shift; cmd_reopen "$@" ;;
     status) shift; cmd_status "$@" ;;
     dep)    shift; cmd_dep "$@" ;;

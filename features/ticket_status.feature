@@ -49,7 +49,7 @@ Feature: Ticket Status Management
     When I run "ticket status test-0001 invalid"
     Then the command should fail
     And the output should contain "Error: invalid status 'invalid'"
-    And the output should contain "open in_progress closed"
+    And the output should contain "open in_progress closed deferred"
 
   Scenario: Status of non-existent ticket
     When I run "ticket status nonexistent open"
@@ -60,3 +60,28 @@ Feature: Ticket Status Management
     When I run "ticket status 0001 in_progress"
     Then the command should succeed
     And ticket "test-0001" should have field "status" with value "in_progress"
+
+  Scenario: Set status to deferred
+    When I run "ticket status test-0001 deferred"
+    Then the command should succeed
+    And the output should be "Updated test-0001 -> deferred"
+    And ticket "test-0001" should have field "status" with value "deferred"
+
+  Scenario: Defer command sets status to deferred
+    When I run "ticket defer test-0001"
+    Then the command should succeed
+    And the output should be "Updated test-0001 -> deferred"
+    And ticket "test-0001" should have field "status" with value "deferred"
+
+  Scenario: Defer command with no id
+    When I run "ticket defer"
+    Then the command should fail
+    And the output should contain "Usage:"
+    And the output should contain "defer <id>"
+
+  Scenario: Reopen command works on deferred ticket
+    Given ticket "test-0001" has status "deferred"
+    When I run "ticket reopen test-0001"
+    Then the command should succeed
+    And the output should be "Updated test-0001 -> open"
+    And ticket "test-0001" should have field "status" with value "open"

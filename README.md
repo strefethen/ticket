@@ -69,8 +69,9 @@ Commands:
     --tags                 Comma-separated tags (e.g., --tags ui,backend,urgent)
   start <id>               Set status to in_progress
   close <id>               Set status to closed
+  defer <id>               Set status to deferred
   reopen <id>              Set status to open
-  status <id> <status>     Update status (open|in_progress|closed)
+  status <id> <status>     Update status (open|in_progress|closed|deferred)
   dep <id> <dep-id>        Add dependency (id depends on dep-id)
   dep tree [--full] <id>   Show dependency tree (--full disables dedup)
   dep cycle                Find dependency cycles in open tickets
