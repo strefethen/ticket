@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # tk-plugin: Validate tickets against the handoff schema
-# tk-plugin-version: 0.1.0
+# tk-plugin-version: 0.2.0
 #
 # Usage:
 #   tk lint <id>           Check one ticket, pretty output, exit 0 pass / 1 fail
@@ -9,11 +9,15 @@
 #   tk lint --all --json   Emit JSON array
 #
 # Required for plan-ready handoff:
-#   frontmatter: writes (non-empty), plan (set)
+#   frontmatter: writes (non-empty), plan (set), an `epic:*` tag
 #   body:        ## Design (non-empty), ## Acceptance Criteria (non-empty)
 #   reads:       present but may be empty (warn)
 #   type/priority are NOT gated in v1 — default values can't be distinguished
 #   from explicit ones without parsing create-time arg history.
+#
+# Epic membership is mandatory. Every ticket must carry at least one
+# `epic:<kebab-name>` tag. Discover existing epics via `tk epics`; define
+# new ones only after user confirmation (see the ticket-writer skill).
 
 set -u
 
@@ -58,8 +62,8 @@ fi
 extract_signals() {
     awk '
     BEGIN {
-        in_fm = 0; in_writes = 0; in_reads = 0;
-        writes_count = 0; reads_count = 0;
+        in_fm = 0; in_writes = 0; in_reads = 0; in_tags = 0;
+        writes_count = 0; reads_count = 0; has_epic_tag = 0;
         plan = ""; type_ = ""; priority_ = ""; id_ = "";
         design_section = 0; design_lines = 0;
         acceptance_section = 0; acceptance_lines = 0;
@@ -73,14 +77,24 @@ extract_signals() {
         else if ($1 == "plan:") { plan = $2 }
         else if ($1 == "type:") { type_ = $2 }
         else if ($1 == "priority:") { priority_ = $2 }
-        else if (/^writes:/) { in_writes = 1; in_reads = 0; next }
-        else if (/^reads:/)  { in_reads = 1;  in_writes = 0; next }
+        else if (/^writes:/) { in_writes = 1; in_reads = 0; in_tags = 0; next }
+        else if (/^reads:/)  { in_reads = 1;  in_writes = 0; in_tags = 0; next }
+        else if (/^tags:/) {
+            # Inline form: tags: [foo, epic:bar]. Also set multiline state
+            # so subsequent "  - epic:x" lines are also scanned.
+            line = $0
+            sub(/^tags:[ ]*/, "", line)
+            if (line ~ /epic:/) has_epic_tag = 1
+            in_tags = 1; in_writes = 0; in_reads = 0
+            next
+        }
         if (/^  - /) {
             if (in_writes) writes_count++
             else if (in_reads) reads_count++
+            else if (in_tags && /epic:/) has_epic_tag = 1
             next
         }
-        if (/^[a-z]/) { in_writes = 0; in_reads = 0 }
+        if (/^[a-z]/) { in_writes = 0; in_reads = 0; in_tags = 0 }
     }
     !in_fm {
         if (/^## Design$/)              { design_section = 1;     acceptance_section = 0; next }
@@ -90,7 +104,7 @@ extract_signals() {
         if (acceptance_section && $0 ~ /[^[:space:]]/) acceptance_lines++
     }
     END {
-        print writes_count "|" reads_count "|" plan "|" design_lines "|" acceptance_lines "|" type_ "|" priority_ "|" id_
+        print writes_count "|" reads_count "|" plan "|" design_lines "|" acceptance_lines "|" type_ "|" priority_ "|" id_ "|" has_epic_tag
     }
     ' "$1"
 }
@@ -100,7 +114,7 @@ lint_one() {
     local file="$1"
     local signals
     signals=$(extract_signals "$file")
-    IFS='|' read -r writes_count reads_count plan design_lines acceptance_lines type_ priority_ id_ <<< "$signals"
+    IFS='|' read -r writes_count reads_count plan design_lines acceptance_lines type_ priority_ id_ has_epic_tag <<< "$signals"
     [[ -z "$id_" ]] && id_=$(basename "$file" .md)
 
     # Evaluate checks. Each is (name|status|detail).
@@ -124,6 +138,15 @@ lint_one() {
         checks+=("plan|pass|$plan")
     else
         checks+=("plan|fail|not set")
+        overall="fail"
+    fi
+
+    # Epic membership is mandatory. Every ticket must carry at least one
+    # `epic:*` tag. Discover existing epics via `tk epics`.
+    if [[ "$has_epic_tag" == "1" ]]; then
+        checks+=("epic|pass|epic:* tag present")
+    else
+        checks+=("epic|fail|no epic:* tag — run 'tk epics' and pick one")
         overall="fail"
     fi
 

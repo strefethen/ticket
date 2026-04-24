@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# tk-plugin: List epic tags used in the current repo's tickets
+# tk-plugin-version: 1.0.0
+#
+# Lists every unique `epic:*` tag value in TICKETS_DIR, one kebab-case
+# name per line (with the `epic:` prefix stripped), sorted.
+#
+# Agents and skills MUST use `tk epics` to discover the set of epics in
+# a repo. Never grep, awk, or otherwise rummage through .tickets/*.md
+# to learn which epics exist — if the answer isn't surfaced by a tk
+# command, the design is broken. See the `ticket-writer` skill for the
+# full epic discipline (mandatory epic tag on every ticket; stop-and-
+# ask if the caller didn't specify).
+#
+# Output contract:
+#   - one epic name per line, kebab-case, `epic:` prefix stripped
+#   - sorted ascending, deduplicated
+#   - exits 0 even when no epics are present (empty output)
+#   - exits non-zero only on missing TICKETS_DIR or missing jq
+
+set -euo pipefail
+
+if ! command -v jq >/dev/null 2>&1; then
+    echo "Error: tk epics requires jq" >&2
+    exit 1
+fi
+
+TICKETS_DIR="${TICKETS_DIR:-.tickets}"
+if [[ ! -d "$TICKETS_DIR" ]]; then
+    echo "Error: $TICKETS_DIR does not exist" >&2
+    exit 1
+fi
+
+TK="${TK_SCRIPT:-tk}"
+
+"$TK" query 2>/dev/null \
+  | jq -r '.tags? // [] | .[] | select(startswith("epic:"))' 2>/dev/null \
+  | sed 's/^epic://' \
+  | sort -u
