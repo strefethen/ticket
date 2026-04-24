@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # tk-plugin: Validate tickets against the handoff schema
-# tk-plugin-version: 0.3.0
+# tk-plugin-version: 0.4.0
 #
 # Usage:
 #   tk lint <id>           Check one ticket, pretty output, exit 0 pass / 1 fail
@@ -9,13 +9,21 @@
 #   tk lint --all --json   Emit JSON array
 #
 # Required for plan-ready handoff:
-#   frontmatter: writes (non-empty), plan (set), an `epic:*` tag
+#   frontmatter: writes (non-empty), plan (set — EXEMPT for type:bug),
+#                an `epic:*` tag
 #   body:        ## Goal (non-empty), ## Design (non-empty),
 #                ## Acceptance Criteria (non-empty),
 #                ## Testing Obligations (non-empty)
 #   reads:       present but may be empty (warn)
 #   type/priority are NOT gated in v1 — default values can't be distinguished
 #   from explicit ones without parsing create-time arg history.
+#
+# `plan:` exemption for bugs: bugs are often reactive (discovered during
+# other work, filed as follow-ups) and don't have a source plan document.
+# Requiring `plan:` on them would either force a fake plan reference or
+# block legitimate tickets at handoff. Bugs still need Goal / Design /
+# Acceptance / Testing Obligations — the exemption is scoped to plan
+# linkage only.
 #
 # Epic membership is mandatory. Every ticket must carry at least one
 # `epic:<kebab-name>` tag. Discover existing epics via `tk epics`; define
@@ -148,6 +156,8 @@ lint_one() {
 
     if [[ -n "$plan" ]]; then
         checks+=("plan|pass|$plan")
+    elif [[ "$type_" == "bug" ]]; then
+        checks+=("plan|pass|not set (exempt for type:bug)")
     else
         checks+=("plan|fail|not set")
         overall="fail"
