@@ -1,0 +1,144 @@
+#!/usr/bin/env bash
+# tk-plugin: Show git-modified files classified by ticket writes: scope
+# tk-plugin-version: 1.0.0
+#
+# Usage: tk status <ticket-id>
+#
+# Shows every git-modified file in the current repo, classified as:
+#   - "In scope"     — file path matches a ticket's writes: entry
+#   - "Out of scope" — file is modified but not declared in writes:
+#
+# Exits non-zero if any out-of-scope files are present. Useful as a
+# pre-commit gate: `tk status <id> && git commit ...` blocks commits
+# that drift outside the declared scope.
+#
+# Matches by exact path (git-repo-relative) OR by absolute path —
+# writes: entries in tk tickets often use absolute paths; `git status
+# --porcelain` emits repo-relative. The match handles both forms.
+#
+# Agents: if `Out of scope` is non-empty during implementation, STOP
+# and follow the scope-expansion protocol in the ticket-writer skill
+# (tk add-note + wait for caller approval). Never silently expand.
+
+set -euo pipefail
+
+TICKET_ID="${1:-}"
+if [[ -z "$TICKET_ID" ]]; then
+    cat >&2 <<'EOF'
+Usage: tk status <ticket-id>
+
+Shows git-modified files classified by the ticket's writes: scope.
+Exits non-zero if any out-of-scope modifications are present.
+EOF
+    exit 1
+fi
+
+TICKETS_DIR="${TICKETS_DIR:-.tickets}"
+FILE="$TICKETS_DIR/${TICKET_ID}.md"
+if [[ ! -f "$FILE" ]]; then
+    echo "Error: ticket not found at $FILE" >&2
+    exit 1
+fi
+
+REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || {
+    echo "Error: not in a git repository" >&2
+    exit 1
+}
+
+# Extract writes: paths from ticket frontmatter (YAML list form only —
+# tk create emits list form).
+declare -a writes=()
+while IFS= read -r w; do
+    [[ -n "$w" ]] && writes+=("$w")
+done < <(awk '
+    BEGIN { fm_state = "before"; in_writes = 0 }
+    /^---$/ {
+        if (fm_state == "before") { fm_state = "inside"; next }
+        else if (fm_state == "inside") { exit }
+    }
+    fm_state == "inside" && /^writes:/ { in_writes = 1; next }
+    fm_state == "inside" && in_writes && /^  - / {
+        sub(/^  - /, "")
+        print
+        next
+    }
+    fm_state == "inside" && /^[a-z]/ { in_writes = 0 }
+' "$FILE")
+
+# Collect git status (porcelain: modified + staged + untracked if -uall,
+# but default -unormal is enough for scope drift detection).
+declare -a status_lines=()
+while IFS= read -r line; do
+    [[ -n "$line" ]] && status_lines+=("$line")
+done < <(cd "$REPO_ROOT" && git status --porcelain)
+
+if [[ ${#status_lines[@]} -eq 0 ]]; then
+    echo "Ticket: $TICKET_ID"
+    echo "writes: scope (${#writes[@]} paths declared)"
+    echo ""
+    echo "No modified files in working tree."
+    exit 0
+fi
+
+if [[ ${#writes[@]} -eq 0 ]]; then
+    echo "Warning: ticket $TICKET_ID has no writes: paths declared — cannot classify scope."
+    echo "Showing all git-modified files:"
+    for l in "${status_lines[@]}"; do
+        echo "  $l"
+    done
+    exit 0
+fi
+
+# Classify each status line
+declare -a in_scope=()
+declare -a out_scope=()
+
+for line in "${status_lines[@]}"; do
+    # Porcelain format: "XY path" — XY is 2-char status, then space, then path.
+    path="${line:3}"
+    # Strip rename arrow if present: "XY old -> new" → classify by destination.
+    [[ "$path" == *" -> "* ]] && path="${path##* -> }"
+    abs="$REPO_ROOT/$path"
+
+    matched=0
+    for w in "${writes[@]}"; do
+        if [[ "$path" == "$w" || "$abs" == "$w" ]]; then
+            matched=1
+            break
+        fi
+    done
+
+    if [[ $matched -eq 1 ]]; then
+        in_scope+=("$line")
+    else
+        out_scope+=("$line")
+    fi
+done
+
+# Report
+echo "Ticket: $TICKET_ID"
+echo "writes: scope (${#writes[@]} paths declared)"
+echo ""
+
+if [[ ${#in_scope[@]} -gt 0 ]]; then
+    echo "In scope (${#in_scope[@]} files):"
+    for l in "${in_scope[@]}"; do
+        echo "  $l"
+    done
+else
+    echo "In scope: none."
+fi
+
+echo ""
+
+if [[ ${#out_scope[@]} -gt 0 ]]; then
+    echo "Out of scope (${#out_scope[@]} files):"
+    for l in "${out_scope[@]}"; do
+        echo "  $l"
+    done
+else
+    echo "Out of scope: none."
+fi
+
+# Exit non-zero if out-of-scope files are present (pre-commit gate signal).
+[[ ${#out_scope[@]} -eq 0 ]]
