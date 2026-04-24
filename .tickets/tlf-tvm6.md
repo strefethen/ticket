@@ -1,6 +1,6 @@
 ---
 id: tlf-tvm6
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-04-24T22:18:15Z
@@ -29,3 +29,9 @@ The 'declared but not modified' check is the genuinely new logic. The --stage fl
 
 Implementation: extend ~/github/ticket-local-fixes/plugins/ticket-status. Existing awk parser already extracts writes:; existing classifier already sorts in/out of scope. Add: (a) iterate writes: paths and diff against modified set to find declared-not-modified, (b) on --stage, emit git add command for in-scope-and-modified subset.
 
+
+## Notes
+
+**2026-04-24T22:23:24Z**
+
+Closed: Landed in ticket-local-fixes@ca716c3 — ticket-status v1.1.0 ships --stage (emits ready-to-run `cd <repo> && git add` command for in-scope-modified subset; refuses on drift), --json (machine-readable output with all four sets + drift boolean), and the declared-but-not-modified check across all output modes. Verified: pretty mode correctly classifies in-scope/out-of-scope/declared-not-modified; --stage refuses on drift; --json emits structured output. Shellcheck clean.
