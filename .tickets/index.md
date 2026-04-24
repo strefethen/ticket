@@ -4,8 +4,8 @@
 
 ## Summary
 
-- **5** tickets total
-- **5** ready · **0** in progress · **0** blocked
+- **6** tickets total
+- **6** ready · **0** in progress · **0** blocked
 - **0** deferred
 - **0** closed — see [closed-tickets.md](./closed-tickets.md)
 
@@ -19,21 +19,23 @@ Tree view of active work, grouped by status and priority. Each id links to its p
 
 - [tlf-pixm — Initialize tk tickets for ticket-local-fixes](./tlf-pixm.md)
 
-### tk-tooling (4)
+### tk-tooling (5)
 
 - [tlf-50et — Warn when writes: path has paired test file not in Testing Obligations](./tlf-50et.md)
 - [tlf-aapz — Add machine-readable closure metadata to tk close](./tlf-aapz.md)
 - [tlf-p8g4 — Promote scope-expansion from note-pattern to first-class status](./tlf-p8g4.md)
+- [tlf-tvm6 — Extend tk status with --stage flag and declared-but-not-modified check](./tlf-tvm6.md)
 - [tlf-ybi2 — Show tier / plan / parent / children / epic block in tk show](./tlf-ybi2.md)
 
 ## Ready
 
-### P3 (5)
+### P3 (6)
 
 - [tlf-50et — Warn when writes: path has paired test file not in Testing Obligations](./tlf-50et.md)
 - [tlf-aapz — Add machine-readable closure metadata to tk close](./tlf-aapz.md)
 - [tlf-p8g4 — Promote scope-expansion from note-pattern to first-class status](./tlf-p8g4.md)
 - [tlf-pixm — Initialize tk tickets for ticket-local-fixes](./tlf-pixm.md)
+- [tlf-tvm6 — Extend tk status with --stage flag and declared-but-not-modified check](./tlf-tvm6.md)
 - [tlf-ybi2 — Show tier / plan / parent / children / epic block in tk show](./tlf-ybi2.md)
 
 ---
