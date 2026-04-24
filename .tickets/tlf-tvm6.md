@@ -1,6 +1,6 @@
 ---
 id: tlf-tvm6
-status: open
+status: in_progress
 deps: []
 links: []
 created: 2026-04-24T22:18:15Z
@@ -8,6 +8,8 @@ type: feature
 priority: 3
 assignee: Steve Trefethen
 tags: [epic:tk-tooling]
+writes:
+  - /Users/stevetrefethen/github/ticket-local-fixes/plugins/ticket-status
 ---
 # Extend tk status with --stage flag and declared-but-not-modified check
 
