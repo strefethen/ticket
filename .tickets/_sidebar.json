@@ -29,13 +29,25 @@
       "slug":  "ready",
       "subsections": [
         {
-          "title": "P3 (4)",
+          "title": "P3 (3)",
           "slug":  "ready/P3",
           "items": [
             { "title": "tlf-50et — Warn when writes: path has paired test file not in Testing Obligations", "slug": "tlf-50et", "priority": 3, "blocked_by": [] },
-            { "title": "tlf-aapz — Add machine-readable closure metadata to tk close", "slug": "tlf-aapz", "priority": 3, "blocked_by": [] },
             { "title": "tlf-p8g4 — Promote scope-expansion from note-pattern to first-class status", "slug": "tlf-p8g4", "priority": 3, "blocked_by": [] },
             { "title": "tlf-ybi2 — Show tier / plan / parent / children / epic block in tk show", "slug": "tlf-ybi2", "priority": 3, "blocked_by": [] }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "In Progress",
+      "slug":  "in_progress",
+      "subsections": [
+        {
+          "title": "P3 (1)",
+          "slug":  "in_progress/P3",
+          "items": [
+            { "title": "tlf-aapz — Add machine-readable closure metadata to tk close", "slug": "tlf-aapz", "priority": 3, "blocked_by": [] }
           ]
         }
       ]
@@ -43,8 +55,8 @@
   ],
   "summary": {
     "total": 6,
-    "ready": 4,
-    "in_progress": 0,
+    "ready": 3,
+    "in_progress": 1,
     "blocked": 0,
     "deferred": 0,
     "closed": 2

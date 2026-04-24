@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # tk-plugin: Validate tickets against the handoff schema
-# tk-plugin-version: 0.4.0
+# tk-plugin-version: 0.5.0
 #
 # Usage:
 #   tk lint <id>           Check one ticket, pretty output, exit 0 pass / 1 fail
@@ -78,11 +78,12 @@ extract_signals() {
     BEGIN {
         in_fm = 0; in_writes = 0; in_reads = 0; in_tags = 0;
         writes_count = 0; reads_count = 0; has_epic_tag = 0;
-        plan = ""; type_ = ""; priority_ = ""; id_ = "";
+        plan = ""; type_ = ""; priority_ = ""; id_ = ""; status_ = "";
         goal_section = 0; goal_lines = 0;
         design_section = 0; design_lines = 0;
         acceptance_section = 0; acceptance_lines = 0;
         testing_section = 0; testing_lines = 0;
+        close_reason = "";
     }
     /^---$/ {
         if (NR == 1) { in_fm = 1; next }
@@ -90,6 +91,7 @@ extract_signals() {
     }
     in_fm {
         if ($1 == "id:") { id_ = $2 }
+        else if ($1 == "status:") { status_ = $2 }
         else if ($1 == "plan:") { plan = $2 }
         else if ($1 == "type:") { type_ = $2 }
         else if ($1 == "priority:") { priority_ = $2 }
@@ -122,9 +124,16 @@ extract_signals() {
         if (design_section && $0 ~ /[^[:space:]]/)     design_lines++
         if (acceptance_section && $0 ~ /[^[:space:]]/) acceptance_lines++
         if (testing_section && $0 ~ /[^[:space:]]/)    testing_lines++
+        # Capture the LAST "Closed: <reason>" line from the body — last
+        # match wins so reopen+reclose cycles report the current reason.
+        # The closure check in lint_one evaluates this only when
+        # status is closed.
+        if (/^Closed: /) close_reason = substr($0, 9)
     }
     END {
-        print writes_count "|" reads_count "|" plan "|" goal_lines "|" design_lines "|" acceptance_lines "|" testing_lines "|" type_ "|" priority_ "|" id_ "|" has_epic_tag
+        # close_reason is last in the pipe order so bash read -r slurps
+        # any "|" characters it may contain as part of the reason text.
+        print writes_count "|" reads_count "|" plan "|" goal_lines "|" design_lines "|" acceptance_lines "|" testing_lines "|" type_ "|" priority_ "|" id_ "|" has_epic_tag "|" status_ "|" close_reason
     }
     ' "$1"
 }
@@ -134,7 +143,7 @@ lint_one() {
     local file="$1"
     local signals
     signals=$(extract_signals "$file")
-    IFS='|' read -r writes_count reads_count plan goal_lines design_lines acceptance_lines testing_lines type_ priority_ id_ has_epic_tag <<< "$signals"
+    IFS='|' read -r writes_count reads_count plan goal_lines design_lines acceptance_lines testing_lines type_ priority_ id_ has_epic_tag status_ close_reason <<< "$signals"
     [[ -z "$id_" ]] && id_=$(basename "$file" .md)
 
     # Evaluate checks. Each is (name|status|detail).
@@ -170,6 +179,22 @@ lint_one() {
     else
         checks+=("epic|fail|no epic:* tag — run 'tk epics' and pick one")
         overall="fail"
+    fi
+
+    # Closure check (tlf-aapz): for tickets with status: closed, the
+    # latest "Closed: <reason>" note must reference a commit hash
+    # (7-40 hex chars anywhere in the text) OR the phrase "no commit"
+    # for closed-without-code tickets. Warn-only; does not flip
+    # overall. Silent for non-closed tickets.
+    if [[ "$status_" == "closed" ]]; then
+        if printf '%s' "$close_reason" | grep -Eq '[a-fA-F0-9]{7,40}'; then
+            hash=$(printf '%s' "$close_reason" | grep -oE '[a-fA-F0-9]{7,40}' | head -1)
+            checks+=("closure|pass|hash: $hash")
+        elif printf '%s' "$close_reason" | grep -qi 'no commit'; then
+            checks+=("closure|pass|\"no commit\" alternative")
+        else
+            checks+=("closure|warn|reason missing commit-hash reference")
+        fi
     fi
 
     if (( goal_lines > 0 )); then

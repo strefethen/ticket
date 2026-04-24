@@ -18,12 +18,17 @@
 
 ## Ready
 
-### P3 (4)
+### P3 (3)
 
 - 🟢 [tlf-50et — Warn when writes: path has paired test file not in Testing Obligations](./tlf-50et.md)
-- 🟢 [tlf-aapz — Add machine-readable closure metadata to tk close](./tlf-aapz.md)
 - 🟢 [tlf-p8g4 — Promote scope-expansion from note-pattern to first-class status](./tlf-p8g4.md)
 - 🟢 [tlf-ybi2 — Show tier / plan / parent / children / epic block in tk show](./tlf-ybi2.md)
+
+## In Progress
+
+### P3 (1)
+
+- 🟢 [tlf-aapz — Add machine-readable closure metadata to tk close](./tlf-aapz.md)
 
 ---
 
