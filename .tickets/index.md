@@ -18,15 +18,14 @@
 
 ## Ready
 
-### P3 (5)
+### P3 (4)
 
 - 🟢 [tlf-50et — Warn when writes: path has paired test file not in Testing Obligations](./tlf-50et.md)
 - 🟢 [tlf-aapz — Add machine-readable closure metadata to tk close](./tlf-aapz.md)
 - 🟢 [tlf-p8g4 — Promote scope-expansion from note-pattern to first-class status](./tlf-p8g4.md)
-- 🟢 [tlf-pixm — Initialize tk tickets for ticket-local-fixes](./tlf-pixm.md)
 - 🟢 [tlf-ybi2 — Show tier / plan / parent / children / epic block in tk show](./tlf-ybi2.md)
 
 ---
 
-**[1 closed tickets →](./closed-tickets.md)**
+**[2 closed tickets →](./closed-tickets.md)**
 

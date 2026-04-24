@@ -4,13 +4,19 @@
 
 Historical archive of closed tickets for this doc set. Regenerated on each `tk sidebar` run. Active work lives in the sidebar and [tree index](./index.md).
 
-Total: **1**
+Total: **2**
 
 ## [tlf-tvm6](./tlf-tvm6.md) — Extend tk status with --stage flag and declared-but-not-modified check
 
 - **Type**: feature
 - **Priority**: P3
 - **Close reason**: Landed in ticket-local-fixes@ca716c3 — ticket-status v1.1.0 ships --stage (emits ready-to-run `cd <repo> && git add` command for in-scope-modified subset; refuses on drift), --json (machine-readable output with all four sets + drift boolean), and the declared-but-not-modified check across all output modes. Verified: pretty mode correctly classifies in-scope/out-of-scope/declared-not-modified; --stage refuses on drift; --json emits structured output. Shellcheck clean.
+
+## [tlf-pixm](./tlf-pixm.md) — Initialize tk tickets for ticket-local-fixes
+
+- **Type**: chore
+- **Priority**: P3
+- **Close reason**: Bootstrap proof-of-life served its purpose. .tickets/ is in active use: 4 tk-tooling tickets migrated from fullstack-starter (ticket-local-fixes@55159f1), tlf-tvm6 implemented (ticket-local-fixes@ca716c3), and multiple sidebar regenerations exercising the pipeline end-to-end. No further action needed; this ticket was a one-time initializer.
 
 ---
 
