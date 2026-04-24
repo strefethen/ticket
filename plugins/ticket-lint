@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # tk-plugin: Validate tickets against the handoff schema
-# tk-plugin-version: 0.2.0
+# tk-plugin-version: 0.3.0
 #
 # Usage:
 #   tk lint <id>           Check one ticket, pretty output, exit 0 pass / 1 fail
@@ -10,7 +10,9 @@
 #
 # Required for plan-ready handoff:
 #   frontmatter: writes (non-empty), plan (set), an `epic:*` tag
-#   body:        ## Design (non-empty), ## Acceptance Criteria (non-empty)
+#   body:        ## Goal (non-empty), ## Design (non-empty),
+#                ## Acceptance Criteria (non-empty),
+#                ## Testing Obligations (non-empty)
 #   reads:       present but may be empty (warn)
 #   type/priority are NOT gated in v1 — default values can't be distinguished
 #   from explicit ones without parsing create-time arg history.
@@ -18,6 +20,10 @@
 # Epic membership is mandatory. Every ticket must carry at least one
 # `epic:<kebab-name>` tag. Discover existing epics via `tk epics`; define
 # new ones only after user confirmation (see the ticket-writer skill).
+#
+# `## Inputs / Outputs` is conditional (required when the ticket produces
+# or consumes a typed interface) and deliberately NOT lint-gated —
+# discipline lives in the ticket-writer skill, not in this plugin.
 
 set -u
 
@@ -65,8 +71,10 @@ extract_signals() {
         in_fm = 0; in_writes = 0; in_reads = 0; in_tags = 0;
         writes_count = 0; reads_count = 0; has_epic_tag = 0;
         plan = ""; type_ = ""; priority_ = ""; id_ = "";
+        goal_section = 0; goal_lines = 0;
         design_section = 0; design_lines = 0;
         acceptance_section = 0; acceptance_lines = 0;
+        testing_section = 0; testing_lines = 0;
     }
     /^---$/ {
         if (NR == 1) { in_fm = 1; next }
@@ -97,14 +105,18 @@ extract_signals() {
         if (/^[a-z]/) { in_writes = 0; in_reads = 0; in_tags = 0 }
     }
     !in_fm {
-        if (/^## Design$/)              { design_section = 1;     acceptance_section = 0; next }
-        if (/^## Acceptance Criteria$/) { acceptance_section = 1; design_section = 0;     next }
-        if (/^## /)                     { design_section = 0;     acceptance_section = 0        }
+        if (/^## Goal$/)                { goal_section = 1; design_section = 0; acceptance_section = 0; testing_section = 0; next }
+        if (/^## Design$/)              { design_section = 1; goal_section = 0; acceptance_section = 0; testing_section = 0; next }
+        if (/^## Acceptance Criteria$/) { acceptance_section = 1; goal_section = 0; design_section = 0; testing_section = 0; next }
+        if (/^## Testing Obligations$/) { testing_section = 1; goal_section = 0; design_section = 0; acceptance_section = 0; next }
+        if (/^## /)                     { goal_section = 0; design_section = 0; acceptance_section = 0; testing_section = 0 }
+        if (goal_section && $0 ~ /[^[:space:]]/)       goal_lines++
         if (design_section && $0 ~ /[^[:space:]]/)     design_lines++
         if (acceptance_section && $0 ~ /[^[:space:]]/) acceptance_lines++
+        if (testing_section && $0 ~ /[^[:space:]]/)    testing_lines++
     }
     END {
-        print writes_count "|" reads_count "|" plan "|" design_lines "|" acceptance_lines "|" type_ "|" priority_ "|" id_ "|" has_epic_tag
+        print writes_count "|" reads_count "|" plan "|" goal_lines "|" design_lines "|" acceptance_lines "|" testing_lines "|" type_ "|" priority_ "|" id_ "|" has_epic_tag
     }
     ' "$1"
 }
@@ -114,7 +126,7 @@ lint_one() {
     local file="$1"
     local signals
     signals=$(extract_signals "$file")
-    IFS='|' read -r writes_count reads_count plan design_lines acceptance_lines type_ priority_ id_ has_epic_tag <<< "$signals"
+    IFS='|' read -r writes_count reads_count plan goal_lines design_lines acceptance_lines testing_lines type_ priority_ id_ has_epic_tag <<< "$signals"
     [[ -z "$id_" ]] && id_=$(basename "$file" .md)
 
     # Evaluate checks. Each is (name|status|detail).
@@ -150,6 +162,13 @@ lint_one() {
         overall="fail"
     fi
 
+    if (( goal_lines > 0 )); then
+        checks+=("goal|pass|$goal_lines line(s)")
+    else
+        checks+=("goal|fail|## Goal section missing or empty")
+        overall="fail"
+    fi
+
     if (( design_lines > 0 )); then
         checks+=("design|pass|$design_lines line(s)")
     else
@@ -161,6 +180,13 @@ lint_one() {
         checks+=("acceptance|pass|$acceptance_lines line(s)")
     else
         checks+=("acceptance|fail|## Acceptance Criteria missing or empty")
+        overall="fail"
+    fi
+
+    if (( testing_lines > 0 )); then
+        checks+=("testing|pass|$testing_lines line(s)")
+    else
+        checks+=("testing|fail|## Testing Obligations section missing or empty")
         overall="fail"
     fi
 
