@@ -4,7 +4,7 @@
 
 Historical archive of closed tickets for this doc set. Regenerated on each `tk sidebar` run. Active work lives in the sidebar and [tree index](./index.md).
 
-Total: **2**
+Total: **3**
 
 ## [tlf-tvm6](./tlf-tvm6.md) — Extend tk status with --stage flag and declared-but-not-modified check
 
@@ -17,6 +17,12 @@ Total: **2**
 - **Type**: chore
 - **Priority**: P3
 - **Close reason**: Bootstrap proof-of-life served its purpose. .tickets/ is in active use: 4 tk-tooling tickets migrated from fullstack-starter (ticket-local-fixes@55159f1), tlf-tvm6 implemented (ticket-local-fixes@ca716c3), and multiple sidebar regenerations exercising the pipeline end-to-end. No further action needed; this ticket was a one-time initializer.
+
+## [tlf-aapz](./tlf-aapz.md) — Add machine-readable closure metadata to tk close
+
+- **Type**: feature
+- **Priority**: P3
+- **Close reason**: Landed in ticket-local-fixes@cd50848 — ticket-lint 0.5.0 adds closure-reason check: closed tickets warn if their close reason lacks a commit-hash-shaped substring (lighter-interim path per Design). Verified via synthetic fixtures (4 scenarios), fullstack-starter corpus (46 closures, mix of pass/warn as designed), and ticket-local-fixes (tlf-pixm passes with hash 55159f1).
 
 ---
 

@@ -1,6 +1,6 @@
 ---
 id: tlf-aapz
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-04-24T22:00:33Z
@@ -69,3 +69,7 @@ Output field position: insert the new check after `epic` and before `goal` in bo
 - Shellcheck clean: `shellcheck ~/github/ticket-local-fixes/plugins/ticket-lint`.
 - Run `tk status tlf-aapz` before commit: verify `plugins/ticket-lint` and `.tickets/tlf-aapz.md` are both in-scope; no out-of-scope drift.
 
+
+**2026-04-24T23:19:19Z**
+
+Closed: Landed in ticket-local-fixes@cd50848 — ticket-lint 0.5.0 adds closure-reason check: closed tickets warn if their close reason lacks a commit-hash-shaped substring (lighter-interim path per Design). Verified via synthetic fixtures (4 scenarios), fullstack-starter corpus (46 closures, mix of pass/warn as designed), and ticket-local-fixes (tlf-pixm passes with hash 55159f1).

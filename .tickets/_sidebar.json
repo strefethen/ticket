@@ -38,27 +38,14 @@
           ]
         }
       ]
-    },
-    {
-      "title": "In Progress",
-      "slug":  "in_progress",
-      "subsections": [
-        {
-          "title": "P3 (1)",
-          "slug":  "in_progress/P3",
-          "items": [
-            { "title": "tlf-aapz — Add machine-readable closure metadata to tk close", "slug": "tlf-aapz", "priority": 3, "blocked_by": [] }
-          ]
-        }
-      ]
     }
   ],
   "summary": {
     "total": 6,
     "ready": 3,
-    "in_progress": 1,
+    "in_progress": 0,
     "blocked": 0,
     "deferred": 0,
-    "closed": 2
+    "closed": 3
   }
 }

@@ -24,13 +24,7 @@
 - 🟢 [tlf-p8g4 — Promote scope-expansion from note-pattern to first-class status](./tlf-p8g4.md)
 - 🟢 [tlf-ybi2 — Show tier / plan / parent / children / epic block in tk show](./tlf-ybi2.md)
 
-## In Progress
-
-### P3 (1)
-
-- 🟢 [tlf-aapz — Add machine-readable closure metadata to tk close](./tlf-aapz.md)
-
 ---
 
-**[2 closed tickets →](./closed-tickets.md)**
+**[3 closed tickets →](./closed-tickets.md)**
 
