@@ -239,7 +239,21 @@ cmd_create() {
             echo "supersedes: [${supersedes//,/, }]"
         fi
         echo "---"
-        echo "# $title"
+        # Priority emoji prefix on the body H1 so standalone ticket
+        # pages (and any plain-markdown viewer) carry the same visual
+        # priority signal the sidebar/index emit. Convention matches
+        # ticket-sidebar's emoji() function: P1 🔴, P2 🟡, P3 🟢,
+        # other ⚪. Source-side embedding is going-forward-only — no
+        # backfill of existing tickets. tk-sidebar's H1 parser strips
+        # the leading emoji so sidebar listings don't double-render it.
+        local _h1_emoji
+        case "$priority" in
+            1) _h1_emoji="🔴" ;;
+            2) _h1_emoji="🟡" ;;
+            3) _h1_emoji="🟢" ;;
+            *) _h1_emoji="⚪" ;;
+        esac
+        echo "# $_h1_emoji $title"
         echo ""
         if [[ -n "$description" ]]; then
             echo "$description"
