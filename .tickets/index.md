@@ -2,13 +2,6 @@
 
 # Tickets — ticket-local-fixes
 
-## Summary
-
-- **6** tickets total
-- **5** ready · **0** in progress · **0** blocked
-- **0** deferred
-- **1** closed — see [closed-tickets.md](./closed-tickets.md)
-
 ## Epics
 
 ### maintenance (1)
