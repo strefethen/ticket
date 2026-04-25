@@ -19,6 +19,7 @@
 - Multi-package distribution: `ticket-core`, `ticket-extras`, and individual plugin packages
 - CI scripts for publishing to Homebrew tap and AUR
 - `create --goal`, `create --testing`, and `create --testing-obligations` flags for generating lint-required handoff sections directly.
+- `ticket-edit --from-file <path>` for non-interactive ticket authoring through the `tk edit` command surface.
 
 ### Fixed
 - `ticket-lint` pretty output now runs under macOS system Bash 3.2; Homebrew Bash is no longer required for the default lint path.
@@ -26,7 +27,7 @@
 - Renamed the writes-scope report plugin from `ticket-status` to `ticket-scope` so bundled plugins no longer shadow the built-in `tk status <id> <status>` mutator.
 
 ### Plugins
-- ticket-edit 1.1.0: Open ticket in $EDITOR (extracted from core); supports explicit non-interactive editor scripts
+- ticket-edit 1.2.0: Open ticket in $EDITOR (extracted from core); supports explicit non-interactive editor scripts and `--from-file <path>`
 - ticket-lint 0.5.1: Validate handoff schema; fixed Bash 3.2 compatibility for pretty output
 - ticket-ls 1.0.0: List tickets with optional filters (extracted from core); `ticket-list` symlink for alias
 - ticket-query 1.0.0: Output tickets as JSON, optionally filtered with jq (extracted from core)

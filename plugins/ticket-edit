@@ -1,14 +1,64 @@
 #!/usr/bin/env bash
 # tk-plugin: Open ticket in $EDITOR
-# tk-plugin-version: 1.1.0
+# tk-plugin-version: 1.2.0
 set -euo pipefail
 
+usage() {
+    echo "Usage: tk edit <id> [--from-file <path>]" >&2
+}
+
 if [[ $# -lt 1 ]]; then
-    echo "Usage: tk edit <id>" >&2
+    usage
     exit 1
 fi
 
-id="$1"
+id=""
+from_file=""
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --from-file)
+            if [[ $# -lt 2 ]]; then
+                echo "Error: --from-file requires a path" >&2
+                exit 1
+            fi
+            from_file="$2"
+            shift 2
+            ;;
+        -h|--help)
+            cat <<'EOF'
+tk edit — open or replace a ticket file.
+
+Usage:
+  tk edit <id>                     Open ticket in $EDITOR
+  tk edit <id> --from-file <path>  Replace ticket content from a file
+  tk edit --from-file <path> <id>  Same, with flag before the ticket id
+
+`--from-file` is intended for non-interactive automation that still needs to
+edit through the tk command surface.
+EOF
+            exit 0
+            ;;
+        --*)
+            echo "Unknown flag: $1" >&2
+            exit 1
+            ;;
+        *)
+            if [[ -n "$id" ]]; then
+                echo "Error: too many arguments" >&2
+                exit 1
+            fi
+            id="$1"
+            shift
+            ;;
+    esac
+done
+
+if [[ -z "$id" ]]; then
+    usage
+    exit 1
+fi
+
 read -r id <<< "$id"
 
 # Resolve ticket file (exact or partial match)
@@ -25,6 +75,20 @@ if [[ ! -f "$file" ]]; then
         echo "Error: ticket '$id' not found" >&2
         exit 1
     fi
+fi
+
+if [[ -n "$from_file" ]]; then
+    if [[ ! -f "$from_file" ]]; then
+        echo "Error: from-file '$from_file' not found" >&2
+        exit 1
+    fi
+    tmp="${file}.tmp.$$"
+    trap 'rm -f "$tmp"' EXIT
+    cp "$from_file" "$tmp"
+    mv "$tmp" "$file"
+    trap - EXIT
+    echo "Updated ticket file: $file"
+    exit 0
 fi
 
 if [ -t 0 ] && [ -t 1 ]; then

@@ -48,6 +48,13 @@ going through the ticket command surface:
 EDITOR=/tmp/update-ticket-body tk edit abc-1234
 ```
 
+For deterministic generated content, prefer `--from-file` over editor-script or
+PTY workarounds:
+
+```bash
+tk edit abc-1234 --from-file /tmp/ticket-body.md
+```
+
 ## Packaging
 
 Plugins here are automatically packaged on release for Homebrew and AUR.

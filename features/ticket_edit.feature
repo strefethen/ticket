@@ -19,6 +19,25 @@ Feature: Ticket Edit
     Then the command should succeed
     And ticket "edit-0001" should contain "Edited by script"
 
+  Scenario: Edit in non-TTY mode replaces content from file
+    Given a replacement ticket file "replacement.md" with title "Replacement ticket"
+    When I run "ticket edit edit-0001 --from-file replacement.md" in non-TTY mode
+    Then the command should succeed
+    And the output should contain "Updated ticket file:"
+    And ticket "edit-0001" should contain "Replacement body"
+    And ticket "edit-0001" should not contain "Editable ticket"
+
+  Scenario: Edit from file accepts flag before ticket id
+    Given a replacement ticket file "replacement.md" with title "Replacement ticket"
+    When I run "ticket edit --from-file replacement.md edit-0001" in non-TTY mode
+    Then the command should succeed
+    And ticket "edit-0001" should contain "Replacement body"
+
+  Scenario: Edit from missing file fails
+    When I run "ticket edit edit-0001 --from-file missing.md" in non-TTY mode
+    Then the command should fail
+    And the output should contain "Error: from-file 'missing.md' not found"
+
   Scenario: Edit non-existent ticket
     When I run "ticket edit nonexistent"
     Then the command should fail

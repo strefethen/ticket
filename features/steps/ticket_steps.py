@@ -162,6 +162,26 @@ def step_editor_script_appends(context, text):
     context.editor_append_text = text
 
 
+@given(r'a replacement ticket file "(?P<filename>[^"]+)" with title "(?P<title>[^"]+)"')
+def step_replacement_ticket_file(context, filename, title):
+    """Create a source file for tk edit --from-file tests."""
+    replacement_path = Path(context.test_dir) / filename
+    replacement_path.write_text(f'''---
+id: edit-0001
+status: open
+deps: []
+links: []
+created: 2024-01-01T00:00:00Z
+type: task
+priority: 2
+---
+# {title}
+
+Replacement body
+''')
+    context.replacement_ticket_file = str(replacement_path)
+
+
 @given(r'ticket "(?P<ticket_id>[^"]+)" has status "(?P<status>[^"]+)"')
 def step_ticket_has_status(context, ticket_id, status):
     """Set ticket status."""

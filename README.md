@@ -94,7 +94,7 @@ Commands:
   super <cmd> [args]       Bypass plugins, run built-in command directly
 
 Official plugins in this repo:
-  edit <id>                Open ticket in $EDITOR
+  edit <id> [--from-file PATH]  Open ticket in $EDITOR or replace from PATH
   lint <id>                Validate a ticket against the handoff schema
   ls|list [--status=X] [-a X] [-T X]   List tickets
   query [jq-filter]        Output tickets as JSON, optionally filtered (requires jq)
