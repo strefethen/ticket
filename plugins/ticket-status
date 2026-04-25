@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # tk-plugin: Show git-modified files classified by ticket writes: scope
-# tk-plugin-version: 1.1.0
+# tk-plugin-version: 1.2.0
 #
 # Usage:
 #   tk status <ticket-id>            Pretty-printed scope report
@@ -21,6 +21,17 @@
 # Matches by exact path (git-repo-relative) OR by absolute path —
 # writes: entries in tk tickets often use absolute paths; `git status
 # --porcelain` emits repo-relative. The match handles both forms.
+#
+# Glob support (v1.2.0+): writes: entries may be bash glob patterns.
+#   /abs/path/packages/frontend/**            — anything under that prefix
+#   /abs/path/packages/frontend/**/*.ts       — only .ts files at any depth
+#   packages/frontend/**                      — same, repo-relative form
+# Globs are matched via bash [[ ]] pattern semantics: * (and ** equivalently)
+# match any sequence including '/'; ? matches one char; [abc] matches a class.
+# Literal paths still work as exact match — non-glob writes: entries behave
+# unchanged. Prefer globs over enumerating every file when the intent is "all
+# files under this prefix"; it's more compact and less brittle to scope drift
+# under a directory boundary you've already declared.
 #
 # Agents: if "Out of scope" is non-empty during implementation, STOP
 # and follow the scope-expansion protocol in the ticket-writer skill
@@ -125,12 +136,19 @@ extract_path() {
     printf '%s' "$path"
 }
 
-# Helper: does a git path (repo-relative) match a writes: entry
-# (which may be repo-relative OR absolute)?
+# Helper: does a git path (repo-relative) match a writes: entry?
+# writes: entries may be:
+#   - repo-relative literal:    plugins/ticket-status
+#   - absolute literal:         /Users/foo/repo/plugins/ticket-status
+#   - repo-relative glob:       plugins/**
+#   - absolute glob:            /Users/foo/repo/packages/frontend/**/*.ts
+# Unquoted RHS is intentional — bash [[ ]] treats unquoted patterns as
+# globs. With a literal entry, this collapses to exact-string equality.
+# shellcheck disable=SC2053  # intentional unquoted RHS for glob matching
 path_matches_write() {
     local path="$1" w="$2"
     local abs="$REPO_ROOT/$path"
-    [[ "$path" == "$w" || "$abs" == "$w" ]]
+    [[ "$path" == $w || "$abs" == $w ]]
 }
 
 # ── Build the four sets ──────────────────────────────────────

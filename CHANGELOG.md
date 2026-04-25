@@ -23,6 +23,7 @@
 - ticket-ls 1.0.0: List tickets with optional filters (extracted from core); `ticket-list` symlink for alias
 - ticket-query 1.0.0: Output tickets as JSON, optionally filtered with jq (extracted from core)
 - ticket-migrate-beads 1.0.0: Import tickets from .beads/issues.jsonl (extracted from core)
+- ticket-status 1.2.0: `writes:` entries may now be glob patterns (e.g. `packages/frontend/**`, `**/*.ts`). Bash `[[ ]]` pattern matching — `*` and `**` both match across `/`, `?` matches one char, `[abc]` matches a class. Literal paths still work as exact match (no behaviour change for non-glob entries). Reframes `writes:` from "every file I will edit" to "the zone I will edit in" — more compact, less brittle to legitimate refactors within a declared boundary
 
 ## [0.3.2] - 2026-02-03
 
