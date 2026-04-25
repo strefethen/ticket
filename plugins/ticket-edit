@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # tk-plugin: Open ticket in $EDITOR
-# tk-plugin-version: 1.0.0
+# tk-plugin-version: 1.1.0
 set -euo pipefail
 
 if [[ $# -lt 1 ]]; then
@@ -29,6 +29,8 @@ fi
 
 if [ -t 0 ] && [ -t 1 ]; then
     "${EDITOR:-vi}" "$file"
+elif [[ -n "${EDITOR:-}" ]]; then
+    "$EDITOR" "$file"
 else
     echo "Edit ticket file: $file"
 fi

@@ -161,7 +161,7 @@ update_yaml_field() {
 cmd_create() {
     ensure_dir
 
-    local title="" description="" design="" acceptance=""
+    local title="" goal="" design="" acceptance="" testing=""
     local priority=2 issue_type="task" assignee="" external_ref="" parent="" tags=""
     local plan="" writes="" reads="" supersedes=""
 
@@ -171,9 +171,10 @@ cmd_create() {
     # Parse args
     while [[ $# -gt 0 ]]; do
         case "$1" in
-            -d|--description) description="$2"; shift 2 ;;
+            -d|--description|--goal) goal="$2"; shift 2 ;;
             --design) design="$2"; shift 2 ;;
             --acceptance) acceptance="$2"; shift 2 ;;
+            --testing|--testing-obligations) testing="$2"; shift 2 ;;
             -p|--priority) priority="$2"; shift 2 ;;
             -t|--type) issue_type="$2"; shift 2 ;;
             -a|--assignee) assignee="$2"; shift 2 ;;
@@ -241,8 +242,10 @@ cmd_create() {
         echo "---"
         echo "# $title"
         echo ""
-        if [[ -n "$description" ]]; then
-            echo "$description"
+        if [[ -n "$goal" ]]; then
+            echo "## Goal"
+            echo ""
+            echo "$goal"
             echo ""
         fi
         if [[ -n "$design" ]]; then
@@ -255,6 +258,12 @@ cmd_create() {
             echo "## Acceptance Criteria"
             echo ""
             echo "$acceptance"
+            echo ""
+        fi
+        if [[ -n "$testing" ]]; then
+            echo "## Testing Obligations"
+            echo ""
+            echo "$testing"
             echo ""
         fi
     } > "$file"
@@ -1357,9 +1366,12 @@ Usage: $cmd <command> [args]
 
 Commands:
   create [title] [options] Create ticket, prints ID
-    -d, --description      Description text
+    -d, --description      Goal text (emits ## Goal)
+    --goal                 Goal text (alias for --description)
     --design               Design notes
     --acceptance           Acceptance criteria
+    --testing              Testing obligations
+    --testing-obligations  Testing obligations (alias for --testing)
     -t, --type             Type (bug|feature|task|epic|chore) [default: task]
     -p, --priority         Priority 0-4, 0=highest [default: 2]
     -a, --assignee         Assignee

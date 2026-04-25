@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # tk-plugin: Show git-modified files classified by ticket writes: scope
-# tk-plugin-version: 1.2.0
+# tk-plugin-version: 1.0.0
 #
 # Usage:
-#   tk status <ticket-id>            Pretty-printed scope report
-#   tk status <ticket-id> --stage    Emit `cd <repo> && git add <paths>` ready to run
-#   tk status <ticket-id> --json     Machine-readable JSON output
+#   tk scope <ticket-id>            Pretty-printed scope report
+#   tk scope <ticket-id> --stage    Emit `cd <repo> && git add <paths>` ready to run
+#   tk scope <ticket-id> --json     Machine-readable JSON output
 #
 # Reports four sets:
 #   - In scope, modified         — files in writes: that are git-modified ("stage these")
@@ -49,14 +49,14 @@ while [[ $# -gt 0 ]]; do
         --json)  MODE="json";  shift ;;
         -h|--help)
             cat <<'EOF'
-tk status — show git-modified files classified by ticket writes: scope.
+tk scope — show git-modified files classified by ticket writes: scope.
 
 Usage:
-  tk status <ticket-id>            Pretty-printed scope report
-  tk status <ticket-id> --stage    Emit `cd <repo> && git add <paths>`
+  tk scope <ticket-id>             Pretty-printed scope report
+  tk scope <ticket-id> --stage     Emit `cd <repo> && git add <paths>`
                                    for the in-scope subset only;
                                    exits non-zero on drift.
-  tk status <ticket-id> --json     Machine-readable JSON output.
+  tk scope <ticket-id> --json      Machine-readable JSON output.
 
 Exit codes (pretty mode):
   0   In scope only OR no modifications.
@@ -83,7 +83,7 @@ done
 
 if [[ -z "$TICKET_ID" ]]; then
     cat >&2 <<'EOF'
-Usage: tk status <ticket-id> [--stage|--json]
+Usage: tk scope <ticket-id> [--stage|--json]
 
 Shows git-modified files classified by the ticket's writes: scope.
 Run with -h for full help.
@@ -138,8 +138,8 @@ extract_path() {
 
 # Helper: does a git path (repo-relative) match a writes: entry?
 # writes: entries may be:
-#   - repo-relative literal:    plugins/ticket-status
-#   - absolute literal:         /Users/foo/repo/plugins/ticket-status
+#   - repo-relative literal:    plugins/ticket-scope
+#   - absolute literal:         /Users/foo/repo/plugins/ticket-scope
 #   - repo-relative glob:       plugins/**
 #   - absolute glob:            /Users/foo/repo/packages/frontend/**/*.ts
 # Unquoted RHS is intentional — bash [[ ]] treats unquoted patterns as
@@ -244,7 +244,7 @@ case "$MODE" in
     stage)
         if [[ ${#out_scope_lines[@]} -gt 0 ]]; then
             echo "Error: ${#out_scope_lines[@]} out-of-scope modification(s) — refusing to emit stage command." >&2
-            echo "Run \`tk status $TICKET_ID\` to see drift, then resolve via the scope-expansion protocol." >&2
+            echo "Run \`tk scope $TICKET_ID\` to see drift, then resolve via the scope-expansion protocol." >&2
             exit 1
         fi
         if [[ ${#in_scope_paths[@]} -eq 0 ]]; then

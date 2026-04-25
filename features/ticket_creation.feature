@@ -21,7 +21,14 @@ Feature: Ticket Creation
   Scenario: Create a ticket with description
     When I run "ticket create 'Test ticket' -d 'This is the description'"
     Then the command should succeed
+    And the created ticket should contain "## Goal"
     And the created ticket should contain "This is the description"
+
+  Scenario: Create a ticket with goal
+    When I run "ticket create 'Goal ticket' --goal 'Deliver the goal'"
+    Then the command should succeed
+    And the created ticket should contain "## Goal"
+    And the created ticket should contain "Deliver the goal"
 
   Scenario: Create a ticket with type
     When I run "ticket create 'Bug ticket' -t bug"
@@ -60,6 +67,19 @@ Feature: Ticket Creation
     Then the command should succeed
     And the created ticket should contain "## Acceptance Criteria"
     And the created ticket should contain "Should pass all tests"
+
+  Scenario: Create a ticket with testing obligations
+    When I run "ticket create 'Testing ticket' --testing 'Run make test'"
+    Then the command should succeed
+    And the created ticket should contain "## Testing Obligations"
+    And the created ticket should contain "Run make test"
+
+  Scenario: Create a lint-ready ticket from flags
+    When I run "ticket create 'Ready ticket' --goal 'Ship a ready ticket' --design 'Use create flags' --acceptance 'Ticket passes lint' --testing 'Run tk lint' --plan 'plans/current/demo.md' --writes 'ticket' --reads 'README.md' --tags 'epic:test'"
+    Then the command should succeed
+    When I lint the created ticket
+    Then the command should succeed
+    And the output should contain "PASS"
 
   Scenario: Ticket has default status open
     When I run "ticket create 'New ticket'"

@@ -57,6 +57,53 @@ Description
     return ticket_path
 
 
+def create_lint_ready_ticket(context, ticket_id, title):
+    """Helper to create a ticket that satisfies ticket-lint."""
+    tickets_dir = Path(context.test_dir) / '.tickets'
+    tickets_dir.mkdir(parents=True, exist_ok=True)
+
+    ticket_path = tickets_dir / f'{ticket_id}.md'
+    content = f'''---
+id: {ticket_id}
+status: open
+deps: []
+links: []
+created: 2024-01-01T00:00:00Z
+type: task
+priority: 2
+tags: [epic:test]
+plan: plans/current/demo.md
+writes:
+  - ticket
+reads:
+  - README.md
+---
+# {title}
+
+## Goal
+
+Ship a lint-ready ticket.
+
+## Design
+
+Use the existing ticket body schema.
+
+## Acceptance Criteria
+
+- The ticket passes lint.
+
+## Testing Obligations
+
+- Run tk lint for this ticket.
+'''
+    ticket_path.write_text(content)
+
+    if not hasattr(context, 'tickets'):
+        context.tickets = {}
+    context.tickets[ticket_id] = ticket_path
+    return ticket_path
+
+
 # ============================================================================
 # Given Steps
 # ============================================================================
@@ -97,6 +144,22 @@ def step_ticket_exists(context, ticket_id, title):
     """Create a ticket with given ID and title (basic, no extra params)."""
     # This is the most generic form - the more specific ones should be defined first
     create_ticket(context, ticket_id, title)
+
+
+@given(r'a lint-ready ticket exists with ID "(?P<ticket_id>[^"]+)" and title "(?P<title>[^"]+)"')
+def step_lint_ready_ticket_exists(context, ticket_id, title):
+    """Create a ticket that passes ticket-lint."""
+    create_lint_ready_ticket(context, ticket_id, title)
+
+
+@given(r'an editor script that appends "(?P<text>[^"]+)"')
+def step_editor_script_appends(context, text):
+    """Create a non-interactive editor script for tk edit tests."""
+    script_path = Path(context.test_dir) / 'append-editor.sh'
+    script_path.write_text('#!/bin/sh\nprintf "\\n%s\\n" "$TK_EDIT_APPEND_TEXT" >> "$1"\n')
+    script_path.chmod(0o755)
+    context.editor_script = str(script_path)
+    context.editor_append_text = text
 
 
 @given(r'ticket "(?P<ticket_id>[^"]+)" has status "(?P<status>[^"]+)"')
@@ -220,19 +283,55 @@ def step_run_command_non_tty(context, command):
     ticket_script = get_ticket_script(context)
     cmd = command.replace('ticket ', f'{ticket_script} ', 1)
 
+    env = os.environ.copy()
+    env.pop('EDITOR', None)
+    env.pop('VISUAL', None)
+
     result = subprocess.run(
         cmd,
         shell=True,
         cwd=context.test_dir,
         capture_output=True,
         text=True,
-        stdin=subprocess.DEVNULL  # Simulate non-TTY
+        stdin=subprocess.DEVNULL,  # Simulate non-TTY
+        env=env
     )
 
     context.result = result
     context.stdout = result.stdout.strip()
     context.stderr = result.stderr.strip()
     context.returncode = result.returncode
+
+
+@when(r'I run "(?P<command>(?:[^"\\]|\\.)+)" in non-TTY mode with EDITOR set to that script')
+def step_run_command_non_tty_with_editor(context, command):
+    """Run a command in non-TTY mode with an explicit editor script."""
+    command = command.replace('\\"', '"')
+
+    ticket_script = get_ticket_script(context)
+    cmd = command.replace('ticket ', f'{ticket_script} ', 1)
+
+    env = os.environ.copy()
+    env['EDITOR'] = context.editor_script
+    env['TK_EDIT_APPEND_TEXT'] = context.editor_append_text
+    if hasattr(context, 'plugin_dir'):
+        env['PATH'] = context.plugin_dir + ':' + env.get('PATH', '')
+
+    result = subprocess.run(
+        cmd,
+        shell=True,
+        cwd=context.test_dir,
+        capture_output=True,
+        text=True,
+        stdin=subprocess.DEVNULL,
+        env=env
+    )
+
+    context.result = result
+    context.stdout = result.stdout.strip()
+    context.stderr = result.stderr.strip()
+    context.returncode = result.returncode
+    context.last_command = command
 
 
 @when(r'I run "(?P<command>(?:[^"\\]|\\.)+)" with no stdin')
@@ -323,6 +422,60 @@ def step_run_command(context, command):
     # If this was a create command, track the created ticket ID
     if 'ticket create' in command and result.returncode == 0:
         context.last_created_id = result.stdout.strip()
+
+
+@when(r'I lint the created ticket')
+def step_lint_created_ticket(context):
+    """Run tk lint for the most recently created ticket."""
+    ticket_script = get_ticket_script(context)
+    cmd = f'{ticket_script} lint {context.last_created_id}'
+
+    cwd = getattr(context, 'working_dir', context.test_dir)
+
+    env = os.environ.copy()
+    if hasattr(context, 'plugin_dir'):
+        env['PATH'] = context.plugin_dir + ':' + env.get('PATH', '')
+
+    result = subprocess.run(
+        cmd,
+        shell=True,
+        cwd=cwd,
+        capture_output=True,
+        text=True,
+        stdin=subprocess.DEVNULL,
+        env=env
+    )
+
+    context.result = result
+    context.stdout = result.stdout.strip()
+    context.stderr = result.stderr.strip()
+    context.returncode = result.returncode
+    context.last_command = cmd
+
+
+@when(r'I run ticket-lint under system bash for ticket "(?P<ticket_id>[^"]+)"')
+def step_run_ticket_lint_under_system_bash(context, ticket_id):
+    """Run the lint plugin with /bin/bash to cover macOS Bash 3.2."""
+    bash_path = '/bin/bash' if Path('/bin/bash').exists() else 'bash'
+    lint_path = Path(context.project_dir) / 'plugins' / 'ticket-lint'
+
+    env = os.environ.copy()
+    env['TICKETS_DIR'] = str(Path(context.test_dir) / '.tickets')
+
+    result = subprocess.run(
+        [bash_path, str(lint_path), ticket_id],
+        cwd=context.test_dir,
+        capture_output=True,
+        text=True,
+        stdin=subprocess.DEVNULL,
+        env=env
+    )
+
+    context.result = result
+    context.stdout = result.stdout.strip()
+    context.stderr = result.stderr.strip()
+    context.returncode = result.returncode
+    context.last_command = f'{bash_path} {lint_path} {ticket_id}'
 
 
 # ============================================================================

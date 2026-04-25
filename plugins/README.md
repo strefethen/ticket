@@ -6,6 +6,10 @@ Official plugins that extend `tk` with additional commands.
 
 Plugins are executables named `tk-<cmd>` or `ticket-<cmd>` in `$PATH`. This repo uses the `ticket-` prefix for consistency.
 
+Official plugins in this repo must not reuse a built-in command name. Keep core
+commands such as `status`, `create`, and `close` owned by the main `ticket`
+script; choose a distinct plugin command such as `scope` for adjacent workflows.
+
 Required metadata in the first 10 lines:
 
 ```bash
@@ -31,6 +35,17 @@ Use `$TK_SCRIPT super <cmd>` to call built-ins without recursing into plugins:
 # tk-plugin-version: 1.0.0
 
 "$TK_SCRIPT" super create "$@" --type task --priority 1
+```
+
+## Non-Interactive Editing
+
+`tk edit <id>` opens `$EDITOR` in an interactive terminal. In non-TTY
+automation, it prints the ticket path unless `EDITOR` is explicitly set; agents
+can point `EDITOR` at an executable script to make structured edits while still
+going through the ticket command surface:
+
+```bash
+EDITOR=/tmp/update-ticket-body tk edit abc-1234
 ```
 
 ## Packaging

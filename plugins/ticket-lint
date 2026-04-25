@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # tk-plugin: Validate tickets against the handoff schema
-# tk-plugin-version: 0.5.0
+# tk-plugin-version: 0.5.1
 #
 # Usage:
 #   tk lint <id>           Check one ticket, pretty output, exit 0 pass / 1 fail
@@ -235,7 +235,9 @@ lint_one() {
         '
     else
         # Pretty output.
-        echo "$id_  ${overall^^}"
+        local overall_label
+        overall_label=$(printf '%s' "$overall" | tr '[:lower:]' '[:upper:]')
+        echo "$id_  $overall_label"
         for c in "${checks[@]}"; do
             IFS='|' read -r rule status detail <<< "$c"
             local marker

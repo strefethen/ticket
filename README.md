@@ -37,7 +37,7 @@ cd ticket && ln -s "$PWD/ticket" ~/.local/bin/tk
 
 ## Requirements
 
-`tk` is a portable bash script requiring only coreutils, so it works out of the box on any POSIX system with bash installed. The `query` command requires `jq`. Uses `rg` (ripgrep) if available, falls back to `grep`.
+`tk` is a portable bash script requiring only coreutils, so it works out of the box on any POSIX system with bash 3.2+ installed. Bundled plugins target the macOS system Bash as well; plugin JSON modes and the `query` command require `jq`. Uses `rg` (ripgrep) if available, falls back to `grep`.
 
 ## Agent Setup
 
@@ -58,15 +58,22 @@ Usage: tk <command> [args]
 
 Commands:
   create [title] [options] Create ticket, prints ID
-    -d, --description      Description text
+    -d, --description      Goal text (emits ## Goal)
+    --goal                 Goal text (alias for --description)
     --design               Design notes
     --acceptance           Acceptance criteria
+    --testing              Testing obligations
+    --testing-obligations  Testing obligations (alias for --testing)
     -t, --type             Type (bug|feature|task|epic|chore) [default: task]
     -p, --priority         Priority 0-4, 0=highest [default: 2]
     -a, --assignee         Assignee [default: git user.name]
     --external-ref         External reference (e.g., gh-123, JIRA-456)
     --parent               Parent ticket ID
     --tags                 Comma-separated tags (e.g., --tags ui,backend,urgent)
+    --plan                 Relative path to a planning .md file (traceability)
+    --writes               Comma-separated paths the agent will edit (block sequence)
+    --reads                Comma-separated paths the agent will read for context
+    --supersedes           Comma-separated ticket ids this ticket replaces
   start <id> [-r reason]   Set status to in_progress (optional reason note)
   close <id> [-r reason]   Set status to closed (optional reason note)
   defer <id> [-r reason]   Set status to deferred (optional reason note)
@@ -86,11 +93,13 @@ Commands:
   add-note <id> [text]     Append timestamped note (or pipe via stdin)
   super <cmd> [args]       Bypass plugins, run built-in command directly
 
-Bundled plugins (ticket-extras):
+Official plugins in this repo:
   edit <id>                Open ticket in $EDITOR
+  lint <id>                Validate a ticket against the handoff schema
   ls|list [--status=X] [-a X] [-T X]   List tickets
   query [jq-filter]        Output tickets as JSON, optionally filtered (requires jq)
   migrate-beads            Import tickets from .beads/issues.jsonl (requires jq)
+  scope <id> [--stage|--json]  Show git-modified files classified by writes: scope
 
 Searches parent directories for .tickets/ (override with TICKETS_DIR env var)
 Supports partial ID matching (e.g., 'tk show 5c4' matches 'nw-5c46')

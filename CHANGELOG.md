@@ -4,6 +4,7 @@
 
 ### Changed
 - Extracted `edit`, `ls`, `query`, and `migrate-beads` commands to plugins (ticket-extras)
+- `create -d/--description` now emits a `## Goal` section, matching the lint handoff schema.
 
 ### Added
 - `deferred` status value for parking tickets that are valid but not being worked on now. Distinct from `closed` (done) — preserves the "valid work, not done" signal
@@ -17,13 +18,20 @@
 - Plugin metadata: `# tk-plugin:` comment for scripts, `--tk-describe` flag for binaries
 - Multi-package distribution: `ticket-core`, `ticket-extras`, and individual plugin packages
 - CI scripts for publishing to Homebrew tap and AUR
+- `create --goal`, `create --testing`, and `create --testing-obligations` flags for generating lint-required handoff sections directly.
+
+### Fixed
+- `ticket-lint` pretty output now runs under macOS system Bash 3.2; Homebrew Bash is no longer required for the default lint path.
+- `ticket-edit` can run an explicitly supplied non-interactive `EDITOR` script outside a TTY, while retaining path-only output when no editor is provided.
+- Renamed the writes-scope report plugin from `ticket-status` to `ticket-scope` so bundled plugins no longer shadow the built-in `tk status <id> <status>` mutator.
 
 ### Plugins
-- ticket-edit 1.0.0: Open ticket in $EDITOR (extracted from core)
+- ticket-edit 1.1.0: Open ticket in $EDITOR (extracted from core); supports explicit non-interactive editor scripts
+- ticket-lint 0.5.1: Validate handoff schema; fixed Bash 3.2 compatibility for pretty output
 - ticket-ls 1.0.0: List tickets with optional filters (extracted from core); `ticket-list` symlink for alias
 - ticket-query 1.0.0: Output tickets as JSON, optionally filtered with jq (extracted from core)
 - ticket-migrate-beads 1.0.0: Import tickets from .beads/issues.jsonl (extracted from core)
-- ticket-status 1.2.0: `writes:` entries may now be glob patterns (e.g. `packages/frontend/**`, `**/*.ts`). Bash `[[ ]]` pattern matching — `*` and `**` both match across `/`, `?` matches one char, `[abc]` matches a class. Literal paths still work as exact match (no behaviour change for non-glob entries). Reframes `writes:` from "every file I will edit" to "the zone I will edit in" — more compact, less brittle to legitimate refactors within a declared boundary
+- ticket-scope 1.0.0: Show git-modified files classified by ticket `writes:` scope. `writes:` entries may be glob patterns (e.g. `packages/frontend/**`, `**/*.ts`). Bash `[[ ]]` pattern matching — `*` and `**` both match across `/`, `?` matches one char, `[abc]` matches a class. Literal paths still work as exact match. Reframes `writes:` from "every file I will edit" to "the zone I will edit in" — more compact, less brittle to legitimate refactors within a declared boundary
 
 ## [0.3.2] - 2026-02-03
 

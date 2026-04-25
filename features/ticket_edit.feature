@@ -13,6 +13,12 @@ Feature: Ticket Edit
     And the output should contain "Edit ticket file:"
     And the output should contain ".tickets/edit-0001.md"
 
+  Scenario: Edit in non-TTY mode runs explicit editor script
+    Given an editor script that appends "Edited by script"
+    When I run "ticket edit edit-0001" in non-TTY mode with EDITOR set to that script
+    Then the command should succeed
+    And ticket "edit-0001" should contain "Edited by script"
+
   Scenario: Edit non-existent ticket
     When I run "ticket edit nonexistent"
     Then the command should fail
