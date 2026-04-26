@@ -1335,6 +1335,146 @@ cmd_add_note() {
     echo "Note added to $(basename "$file" .md)"
 }
 
+# === Body-section mutation helpers (private) ===
+#
+# Phase 3 of backend-opacity: agents mutate ticket body sections through
+# explicit per-field commands instead of opening $EDITOR. Section values
+# accept markdown content (lists, code blocks, links, emphasis).
+
+# Read a value-or-stdin source into a temp file, return the path.
+# Caller is responsible for rm -f on the returned path.
+_section_value_to_tmp() {
+    local value="$1"
+    local out_file
+    out_file=$(mktemp -t "tk-section.XXXXXX")
+    if [[ "$value" == "@-" ]]; then
+        cat > "$out_file"
+    elif [[ "$value" == @* ]]; then
+        rm -f "$out_file"
+        echo "Error: @file inputs are not supported; pass inline text or @- to read stdin" >&2
+        exit 1
+    else
+        printf '%s\n' "$value" > "$out_file"
+    fi
+    printf '%s' "$out_file"
+}
+
+# Replace the body content under <heading> with <content_file>'s contents.
+# If <heading> doesn't exist, append it at the end (creates the section).
+_section_replace() {
+    local file="$1" heading="$2" content_file="$3"
+    if grep -Fxq "$heading" "$file"; then
+        local tmp="${file}.tmp.$$"
+        awk -v heading="$heading" -v content_file="$content_file" '
+            BEGIN {
+                content_count = 0
+                while ((getline line < content_file) > 0) {
+                    content[++content_count] = line
+                }
+                close(content_file)
+                replacing = 0
+            }
+            function emit_section() {
+                print heading
+                print ""
+                for (i = 1; i <= content_count; i++) print content[i]
+                print ""
+            }
+            $0 == heading      { emit_section(); replacing = 1; next }
+            replacing && /^##[[:space:]]+/ { replacing = 0 }
+            replacing          { next }
+                               { print }
+        ' "$file" > "$tmp" && mv "$tmp" "$file"
+    else
+        {
+            printf '\n%s\n\n' "$heading"
+            cat "$content_file"
+            printf '\n'
+        } >> "$file"
+    fi
+}
+
+# Append <content_file>'s contents to the existing <heading> section.
+# If the section is missing, create it at the end.
+_section_append() {
+    local file="$1" heading="$2" content_file="$3"
+    if grep -Fxq "$heading" "$file"; then
+        local tmp="${file}.tmp.$$"
+        awk -v heading="$heading" -v content_file="$content_file" '
+            BEGIN {
+                content_count = 0
+                while ((getline line < content_file) > 0) {
+                    content[++content_count] = line
+                }
+                close(content_file)
+                in_section = 0
+                appended = 0
+            }
+            function emit_appended() {
+                if (appended) return
+                print ""
+                for (i = 1; i <= content_count; i++) print content[i]
+                appended = 1
+            }
+            $0 == heading                  { print; in_section = 1; next }
+            in_section && /^##[[:space:]]+/ { emit_appended(); print ""; in_section = 0; print; next }
+            { print }
+            END { if (in_section) emit_appended() }
+        ' "$file" > "$tmp" && mv "$tmp" "$file"
+    else
+        {
+            printf '\n%s\n\n' "$heading"
+            cat "$content_file"
+            printf '\n'
+        } >> "$file"
+    fi
+}
+
+# Friendly section name for output (strip "## " prefix)
+_section_label() {
+    local heading="$1"
+    printf '%s' "${heading#\#\# }"
+}
+
+# Common implementation for set-<field> commands.
+_section_set_cmd() {
+    local heading="$1" id="${2:-}" value="${3:-}"
+    if [[ -z "$id" || -z "$value" ]]; then
+        echo "Usage: $(basename "$0") set-$(_section_label "$heading" | tr '[:upper:] ' '[:lower:]-') <id> <value-or-@->" >&2
+        return 1
+    fi
+    local file
+    file=$(ticket_path "$id") || return 1
+    local content_file
+    content_file=$(_section_value_to_tmp "$value")
+    _section_replace "$file" "$heading" "$content_file"
+    rm -f "$content_file"
+    echo "Updated $(basename "$file" .md): $(_section_label "$heading")"
+}
+
+# Common implementation for append-<field> commands.
+_section_append_cmd() {
+    local heading="$1" id="${2:-}" value="${3:-}"
+    if [[ -z "$id" || -z "$value" ]]; then
+        echo "Usage: $(basename "$0") append-$(_section_label "$heading" | tr '[:upper:] ' '[:lower:]-') <id> <value-or-@->" >&2
+        return 1
+    fi
+    local file
+    file=$(ticket_path "$id") || return 1
+    local content_file
+    content_file=$(_section_value_to_tmp "$value")
+    _section_append "$file" "$heading" "$content_file"
+    rm -f "$content_file"
+    echo "Appended to $(basename "$file" .md): $(_section_label "$heading")"
+}
+
+cmd_set_goal()         { _section_set_cmd "## Goal" "$@"; }
+cmd_set_design()       { _section_set_cmd "## Design" "$@"; }
+cmd_set_acceptance()   { _section_set_cmd "## Acceptance Criteria" "$@"; }
+cmd_set_testing()      { _section_set_cmd "## Testing Obligations" "$@"; }
+cmd_append_design()    { _section_append_cmd "## Design" "$@"; }
+cmd_append_acceptance(){ _section_append_cmd "## Acceptance Criteria" "$@"; }
+
 # List installed plugins with descriptions
 # Scripts: # tk-plugin: description (comment in first 10 lines)
 # Binaries: --tk-describe flag outputs description
@@ -1412,7 +1552,16 @@ Commands:
   closed [--limit=N] [-a X] [-T X] List recently closed tickets (default 20, by mtime)
   show <id>                Display ticket
   add-note <id> [text]     Append timestamped note (or pipe via stdin)
+  set-goal <id> <value>    Replace the Goal section (value or @- for stdin)
+  set-design <id> <value>  Replace the Design section
+  set-acceptance <id> <value>      Replace the Acceptance Criteria section
+  set-testing <id> <value> Replace the Testing Obligations section
+  append-design <id> <value>       Append text to the Design section
+  append-acceptance <id> <value>   Append text to the Acceptance Criteria section
   super <cmd> [args]       Bypass plugins, run built-in command directly
+
+Body section values accept markdown for formatting (lists, code blocks,
+links, emphasis). Use @- to read the value from stdin.
 EOF
 
     # List installed plugins
@@ -1494,6 +1643,12 @@ case "${1:-help}" in
     closed) shift; cmd_closed "$@" ;;
     show)   shift; cmd_show "$@" ;;
     add-note) shift; cmd_add_note "$@" ;;
+    set-goal)         shift; cmd_set_goal "$@" ;;
+    set-design)       shift; cmd_set_design "$@" ;;
+    set-acceptance)   shift; cmd_set_acceptance "$@" ;;
+    set-testing)      shift; cmd_set_testing "$@" ;;
+    append-design)    shift; cmd_append_design "$@" ;;
+    append-acceptance) shift; cmd_append_acceptance "$@" ;;
     help|--help|-h) cmd_help ;;
     *)
         echo "Unknown command: $1" >&2

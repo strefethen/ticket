@@ -23,6 +23,8 @@
 - `ticket-edit` body-section flags (`--goal`, `--design`, `--acceptance`, `--testing`) with inline and `@-` stdin values for non-interactive section updates.
 - `tk complete <id>` plugin — explicit "I'm done editing files for this ticket" signal. Releases all claims via the per-ticket index. Idempotent. Ticket status unchanged.
 - `tk force-release <path>` plugin — recovery for stuck claims (crashed sessions, abandoned tickets). Bypasses ownership check; tags audit event as `force-release` so recovery operations are distinguishable from normal release flow.
+- `tk set-goal`, `tk set-design`, `tk set-acceptance`, `tk set-testing` — replace body sections via CLI flags without invoking `$EDITOR`. Section values accept markdown formatting (lists, code blocks, links, emphasis); pass values inline or via `@-` to read from stdin.
+- `tk append-design`, `tk append-acceptance` — additive variants that append text to existing sections (or create the section if missing). Same value conventions as set-* commands.
 
 ### Fixed
 - `ticket-lint` pretty output now runs under macOS system Bash 3.2; Homebrew Bash is no longer required for the default lint path.
