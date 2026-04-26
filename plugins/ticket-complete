@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+# tk-plugin: Release all file claims for a ticket (work-done signal)
+# tk-plugin-version: 1.0.0
+#
+# Usage: tk complete <ticket-id>
+#
+# Explicit "I'm done editing files for this ticket" signal. Releases every
+# claim held by the ticket via the per-ticket index. Ticket status is
+# unchanged — that's tk close's job.
+#
+# Idempotent: empty index → "released 0 files". Running twice in a row is
+# a no-op the second time.
+#
+# Exit codes:
+#   0 — completed (zero or more claims released)
+#   1 — invalid args or Redis unreachable
+#
+# Env:
+#   REDIS_HOST, REDIS_PORT, REDIS_PASSWORD — connection
+#   TK_REPO     — override repo namespace (default: derived from TICKETS_DIR)
+
+set -euo pipefail
+
+if [[ $# -lt 1 ]]; then
+    echo "Usage: tk complete <ticket-id>" >&2
+    exit 1
+fi
+
+TICKET="$1"
+
+# Repo namespace — matches ticket-claim plugin's logic exactly so the
+# keyspace lines up.
+if [[ -n "${TK_REPO:-}" ]]; then
+    REPO="$TK_REPO"
+elif [[ -n "${TICKETS_DIR:-}" ]]; then
+    REPO=$(basename "$(dirname "$(cd "$TICKETS_DIR" 2>/dev/null && pwd)")")
+else
+    REPO=$(basename "$PWD")
+fi
+
+redis() {
+    redis-cli -h "${REDIS_HOST:-localhost}" -p "${REDIS_PORT:-6379}" \
+        -a "${REDIS_PASSWORD:-}" "$@" 2>/dev/null
+}
+
+INDEX_KEY="tk:${REPO}:ticket-claims:${TICKET}"
+
+# Read all paths held by this ticket. Use while-read for bash 3.2 portability
+# (mapfile is bash 4+, not on default macOS bash).
+PATHS=()
+while IFS= read -r path; do
+    [[ -z "$path" ]] && continue
+    PATHS+=("$path")
+done < <(redis SMEMBERS "$INDEX_KEY")
+
+if [[ ${#PATHS[@]} -eq 0 ]]; then
+    echo "released 0 files for ${TICKET}"
+    exit 0
+fi
+
+# Release each path via the existing tk release plugin (atomic Lua, idempotent).
+# Use arithmetic substitution rather than ((COUNT++)) so set -e doesn't trip
+# when COUNT is 0.
+COUNT=0
+for path in "${PATHS[@]}"; do
+    if tk release "$TICKET" "$path" >/dev/null 2>&1; then
+        COUNT=$((COUNT + 1))
+    fi
+done
+
+# DEL the per-ticket index — tk release's SREM should empty it, but the
+# explicit DEL is the final guarantee that no stale empty Set lingers.
+redis DEL "$INDEX_KEY" >/dev/null
+
+echo "released ${COUNT} file(s) for ${TICKET}"

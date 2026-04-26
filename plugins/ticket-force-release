@@ -1,0 +1,123 @@
+#!/usr/bin/env bash
+# tk-plugin: Force-release a stuck file claim (recovery for crashed sessions)
+# tk-plugin-version: 1.0.0
+#
+# Usage: tk force-release <path>
+#
+# Bypasses the normal ownership check. Use when a claim is stuck — agent
+# crashed, hook failed, ticket was abandoned. The audit stream tags the
+# event as 'force-release' (rather than 'release') so recovery operations
+# are distinguishable from normal complete-flow releases.
+#
+# Exit codes:
+#   0 — claim released, OR was not held (idempotent recovery)
+#   1 — Redis unreachable, invalid args
+#
+# Env:
+#   REDIS_HOST, REDIS_PORT, REDIS_PASSWORD — connection
+#   TK_REPO     — override repo namespace
+#   TK_AGENT_ID — recorded as 'forced_by' in audit (default 'unknown')
+
+set -euo pipefail
+
+if [[ $# -lt 1 ]]; then
+    echo "Usage: tk force-release <path>" >&2
+    exit 1
+fi
+
+RAW_PATH="$1"
+
+if [[ "$RAW_PATH" = /* ]]; then
+    ABS_PATH="$RAW_PATH"
+else
+    parent_dir="$(cd "$(dirname "$RAW_PATH")" 2>/dev/null && pwd)"
+    if [[ -z "$parent_dir" ]]; then
+        echo "Error: cannot resolve parent directory for: $RAW_PATH" >&2
+        exit 1
+    fi
+    ABS_PATH="$parent_dir/$(basename "$RAW_PATH")"
+fi
+
+if [[ -n "${TK_REPO:-}" ]]; then
+    REPO="$TK_REPO"
+elif [[ -n "${TICKETS_DIR:-}" ]]; then
+    REPO=$(basename "$(dirname "$(cd "$TICKETS_DIR" 2>/dev/null && pwd)")")
+else
+    REPO=$(basename "$PWD")
+fi
+
+CALLER="${TK_AGENT_ID:-unknown}"
+NOW=$(date -u +%s)
+
+redis() {
+    redis-cli -h "${REDIS_HOST:-localhost}" -p "${REDIS_PORT:-6379}" \
+        -a "${REDIS_PASSWORD:-}" "$@" 2>/dev/null
+}
+
+CLAIM_KEY="tk:${REPO}:claim:write:${ABS_PATH}"
+STREAM_KEY="tk:${REPO}:audit:claims"
+REPO_PREFIX="tk:${REPO}"
+
+# Atomic Lua: GET → DEL + SREM (if we can decode original ticket) + XADD.
+# Note: the per-ticket index SREM uses a dynamically-constructed key. This
+# works on standalone Redis (single hash slot). Not cluster-safe — but
+# ticket Redis usage is single-instance per project memory.
+LUA='
+local key = KEYS[1]
+local stream = KEYS[2]
+local path = ARGV[1]
+local caller = ARGV[2]
+local ts = ARGV[3]
+local repo_prefix = ARGV[4]
+
+local existing = redis.call("GET", key)
+if not existing then
+    return "not-held"
+end
+
+local original_ticket = "unknown"
+local ok, existing_data = pcall(cjson.decode, existing)
+if ok and existing_data.ticket_id then
+    original_ticket = existing_data.ticket_id
+    redis.call("SREM", repo_prefix .. ":ticket-claims:" .. original_ticket, path)
+end
+
+redis.call("DEL", key)
+redis.call("XADD", stream, "*",
+    "event", "force-release",
+    "ticket", original_ticket,
+    "forced_by", caller,
+    "path", path,
+    "ts", ts)
+
+return "force-released:" .. original_ticket
+'
+
+RESULT=$(redis EVAL "$LUA" 2 "$CLAIM_KEY" "$STREAM_KEY" \
+    "$ABS_PATH" "$CALLER" "$NOW" "$REPO_PREFIX")
+RC=$?
+
+if [[ $RC -ne 0 ]]; then
+    echo "Error: Redis unreachable (exit $RC)" >&2
+    exit 1
+fi
+
+case "$RESULT" in
+    not-held)
+        echo "not held: $ABS_PATH"
+        exit 0
+        ;;
+    force-released:*)
+        original=${RESULT#force-released:}
+        echo "force-released: $ABS_PATH (was held by $original)"
+        exit 0
+        ;;
+    "")
+        echo "Error: empty response from Redis (likely auth or connectivity)" >&2
+        exit 1
+        ;;
+    *)
+        echo "Error: unexpected response: $RESULT" >&2
+        exit 1
+        ;;
+esac

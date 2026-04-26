@@ -6,6 +6,7 @@
 - Extracted `edit`, `ls`, `query`, and `migrate-beads` commands to plugins (ticket-extras)
 - `create -d/--description` now emits a `## Goal` section, matching the lint handoff schema.
 - `ticket-edit` no longer supports whole-ticket replacement through `--from-file`, non-TTY editor scripts, or `@file` section sources; non-TTY callers must use structured commands and body-section flags instead of treating ticket markdown paths as an automation API.
+- `tk close <id>` now releases all held file claims for the ticket as a best-effort side effect (calls `tk complete` first; output silenced — audit stream is the canonical record). Redis being unreachable does not block close.
 
 ### Added
 - `deferred` status value for parking tickets that are valid but not being worked on now. Distinct from `closed` (done) — preserves the "valid work, not done" signal
@@ -19,12 +20,16 @@
 - Plugin metadata: `# tk-plugin:` comment for scripts, `--tk-describe` flag for binaries
 - `create --goal`, `create --testing`, and `create --testing-obligations` flags for generating lint-required handoff sections directly.
 - `ticket-edit` body-section flags (`--goal`, `--design`, `--acceptance`, `--testing`) with inline and `@-` stdin values for non-interactive section updates.
+- `tk complete <id>` plugin — explicit "I'm done editing files for this ticket" signal. Releases all claims via the per-ticket index. Idempotent. Ticket status unchanged.
+- `tk force-release <path>` plugin — recovery for stuck claims (crashed sessions, abandoned tickets). Bypasses ownership check; tags audit event as `force-release` so recovery operations are distinguishable from normal release flow.
 
 ### Fixed
 - `ticket-lint` pretty output now runs under macOS system Bash 3.2; Homebrew Bash is no longer required for the default lint path.
 - Renamed the writes-scope report plugin from `ticket-status` to `ticket-scope` so bundled plugins no longer shadow the built-in `tk status <id> <status>` mutator.
 
 ### Plugins
+- ticket-complete 1.0.0: Explicit release of all file claims for a ticket. Companion to `tk close`'s auto-release; useful when you want to release claims but keep the ticket open (e.g., for review).
+- ticket-force-release 1.0.0: Stuck-claim recovery. Releases unconditionally and tags the audit stream with `event=force-release` to distinguish from normal flow.
 - ticket-edit 1.5.0: Open or update ticket sections; removed `--from-file`, non-TTY editor scripts, and `@file` section sources so automation updates tickets only through structured flags with inline or `@-` values
 - ticket-lint 0.5.1: Validate handoff schema; fixed Bash 3.2 compatibility for pretty output
 - ticket-ls 1.0.0: List tickets with optional filters (extracted from core); `ticket-list` symlink for alias

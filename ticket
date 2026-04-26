@@ -366,6 +366,20 @@ cmd_close() {
         return 1
     fi
     local id="$1"; shift
+
+    # Best-effort: release any held file claims before marking closed.
+    # Resolves the full ID first so partial-ID matches work consistently.
+    # Redis down or 'tk complete' plugin missing → silently skip (TTL is
+    # the abandonment safety net).
+    #
+    # Output is silenced — the audit stream is the canonical record of
+    # claim releases, and close should produce a clean single-line status
+    # update regardless of internal side effects.
+    local _file
+    if _file=$(ticket_path "$id" 2>/dev/null); then
+        tk complete "$(basename "$_file" .md)" >/dev/null 2>&1 || true
+    fi
+
     cmd_status "$id" "closed" "$@"
 }
 
