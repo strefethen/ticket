@@ -1,0 +1,5 @@
+# Planning artifacts — local-only per project convention.
+# Drafts, scope notes, and assessments live alongside code on disk
+# but are not published. See user CLAUDE.md "Plans Lifecycle" for the
+# directory structure (plans/current/, plans/completed/, etc.).
+plans/
