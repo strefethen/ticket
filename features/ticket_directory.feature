@@ -38,14 +38,14 @@ Feature: Ticket Directory Resolution
     Given the tickets directory does not exist
     When I run "ticket show nonexistent"
     Then the command should fail
-    And the output should contain "no .tickets directory found"
+    And the output should contain "no ticket store found"
 
   Scenario: Error when no tickets directory in any parent
     Given the tickets directory does not exist
     And I am in subdirectory "orphan/deep/path"
     When I run "ticket ready"
     Then the command should fail
-    And the output should contain "no .tickets directory found"
+    And the output should contain "no ticket store found"
 
   Scenario: TICKETS_DIR env var takes priority over parent walking
     Given a ticket exists with ID "parent-0001" and title "Parent ticket"
