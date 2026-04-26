@@ -15,20 +15,12 @@ The git-backed issue tracker for AI agents. Rooted in the Unix Philosophy, `tk` 
 A few opinions that shape this fork beyond what upstream provides:
 
 - **Agent-first.** Designed primarily for AI agents (Claude Code, Codex), not interactive humans. `CLAUDE.md` and `AGENTS.md` are first-class artifacts.
-- **Backend opacity.** Storage is an implementation detail. The direction of travel is for agents to interact only through the `tk` CLI — no `$EDITOR`, no file paths, no awareness of the underlying format. This frees the project to evolve the backend without breaking agent workflows.
+- **Backend opacity.** Storage is sealed — agents interact only through the `tk` CLI. No `$EDITOR`, no file paths in output, no direct file access. Body fields accept **markdown** for formatting (bullets, code blocks, links, emphasis); the on-disk *storage* format is hidden so it can change. This frees the project to evolve the backend without breaking agent workflows.
 - **Redis-coordinated file claims.** Plugins (`tk claim`, `tk release`, `tk check`, `tk audit`) provide cross-agent file reservation so multiple agents working concurrently don't overwrite each other's edits. Lua-atomic acquire/release with a per-ticket index for enumeration.
 - **Consolidated plugin suite.** Plugins that previously lived across multiple repos (`ticket-claim`, `ticket-release`, `ticket-audit`, `ticket-check`, `ticket-epics`, `ticket-lint`, `ticket-scope`, `ticket-work-on`/`work-off`, `ticket-query-docs`, `ticket-sidebar`) all ship from `plugins/` in this tree.
 - **CI for verification, not distribution.** GitHub Actions run Behave tests and `shellcheck` on every push and pull request. No Homebrew tap, no AUR — install from source.
 
-Internally, tickets are markdown files with YAML frontmatter in `.tickets/`. The CLI treats that storage as an implementation detail for agents while preserving plain-text searchability.
-
-Using ticket IDs as file names also allows IDEs to quickly navigate to the ticket for you. For example, you might run `git log` in your terminal and see something like:
-
-```
-nw-5c46: add SSE connection management 
-```
-
-VS Code allows you to Ctrl+Click or Cmd+Click the ID and jump directly to the file to read the details.
+Ticket IDs (e.g., `nw-5c46`) appear in commit messages and `tk` output as the durable handle for any ticket. Pass an ID to commands like `tk show`, `tk start`, `tk close` — `tk` resolves partial IDs, so `tk show 5c46` works once the prefix is unique.
 
 ## Install
 
@@ -63,7 +55,7 @@ Usage: tk <command> [args]
 
 Commands:
   create [title] [options] Create ticket, prints ID
-    -d, --description      Goal text (emits ## Goal)
+    -d, --description      Goal text
     --goal                 Goal text (alias for --description)
     --design               Design notes
     --acceptance           Acceptance criteria
@@ -75,7 +67,7 @@ Commands:
     --external-ref         External reference (e.g., gh-123, JIRA-456)
     --parent               Parent ticket ID
     --tags                 Comma-separated tags (e.g., --tags ui,backend,urgent)
-    --plan                 Relative path to a planning .md file (traceability)
+    --plan                 Relative path to a planning doc (traceability)
     --writes               Comma-separated paths the agent will edit (block sequence)
     --reads                Comma-separated paths the agent will read for context
     --supersedes           Comma-separated ticket ids this ticket replaces
@@ -90,7 +82,6 @@ Commands:
   undep <id> <dep-id>      Remove dependency
   link <id> <id> [id...]   Link tickets together (symmetric)
   unlink <id> <target-id>  Remove link between tickets
-  ls|list [--status=X] [-a X] [-T X]   List tickets
   ready [-a X] [-T X]      List open/in-progress tickets with deps resolved
   blocked [-a X] [-T X]    List open/in-progress tickets with unresolved deps
   closed [--limit=N] [-a X] [-T X] List recently closed tickets (default 20, by mtime)
@@ -98,28 +89,41 @@ Commands:
   add-note <id> [text]     Append timestamped note (or pipe via stdin)
   super <cmd> [args]       Bypass plugins, run built-in command directly
 
-Official plugins in this repo:
-  edit <id> [--goal TEXT] [--design TEXT] [--acceptance TEXT] [--testing TEXT]
-                           Open ticket interactively or update body sections
-  lint <id>                Validate a ticket against the handoff schema
-  ls|list [--status=X] [-a X] [-T X]   List tickets
-  query [jq-filter]        Output tickets as JSON, optionally filtered (requires jq)
-  migrate-beads            Import tickets from .beads/issues.jsonl (requires jq)
-  scope <id> [--stage|--json]  Show git-modified files classified by writes: scope
+Plugins (tk-<cmd> or ticket-<cmd> in PATH):
+  audit                  View the tk:<repo>:audit:claims Redis stream
+  check                  Check who holds the claim on a file path (if anyone)
+  claim                  Acquire a write claim on a file path via Redis
+  complete               Release all file claims for a ticket (work-done signal)
+  edit                   Open or update ticket sections
+  epics                  List epic tags used in the current repo's tickets
+  force-release          Force-release a stuck file claim (recovery for crashed sessions)
+  lint                   Validate tickets against the handoff schema
+  list                   List tickets with optional filters
+  ls                     List tickets with optional filters
+  query                  Output tickets as JSON, optionally filtered with jq
+  query-docs             Full-text search across ticket bodies (Design, Acceptance, descriptions)
+  release                Release a write claim on a file path
+  scope                  Show git-modified files classified by ticket writes: scope
+  sidebar                Generate _sidebar.json for the fullstack-starter docs engine
+  work-off               Clear the active ticket for this repo
+  work-on                Set the active ticket for this repo
 
-Searches parent directories for .tickets/ (override with TICKETS_DIR env var)
+Use 'super' to bypass plugins. Plugin authoring: see plugins/README.md.
+
+Plugin descriptions: comment '# tk-plugin: text' or --tk-describe flag
+
 Supports partial ID matching (e.g., 'tk show 5c4' matches 'nw-5c46')
 ```
 
 `tk edit` body-section flags mirror `tk create`: `-d`/`--description`/`--goal`
-updates `## Goal`, `--design` updates `## Design`, `--acceptance` updates
-`## Acceptance Criteria`, and `--testing`/`--testing-obligations` updates
-`## Testing Obligations`. Section values may be inline text or `@-` for stdin.
-Only one body section flag may read from stdin in a single command.
-Automation should prefer `@-` for generated content and should not assemble or
-replace complete ticket markdown files.
-In non-TTY contexts, `tk edit <id>` requires section flags; it does not reveal
-the underlying ticket file path or run an editor script as an automation API.
+updates the Goal section, `--design` updates Design, `--acceptance` updates
+Acceptance Criteria, and `--testing`/`--testing-obligations` updates Testing
+Obligations. Section values **accept markdown for formatting** — bullets,
+code blocks, links, and emphasis all work. Pass values inline or via `@-` for
+stdin. Only one body section flag may read from stdin in a single command.
+Automation should prefer `@-` for generated content and pass section values
+through these flags rather than attempting to write tickets directly. In
+non-TTY contexts, `tk edit <id>` requires section flags.
 
 ## Plugins
 
@@ -144,7 +148,7 @@ tk help         # lists it under "Plugins"
 - Binaries: `--tk-describe` flag outputs `tk-plugin: description`
 
 **Plugin environment variables:**
-- `TICKETS_DIR` - path to the .tickets directory (may be empty)
+- `TICKETS_DIR` - absolute path to the ticket store (may be empty)
 - `TK_SCRIPT` - absolute path to the tk script
 
 **Calling built-ins from plugins:**

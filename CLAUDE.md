@@ -10,8 +10,8 @@ See @README.md for usage documentation. Run `tk help` for command reference. Alw
 
 Key functions:
 - `generate_id()` - Creates IDs from directory name prefix + random suffix
-- `ticket_path()` - Resolves partial IDs to full file paths
-- `yaml_field()` / `update_yaml_field()` - YAML frontmatter manipulation via sed
+- `ticket_path()` - Resolves partial IDs to the internal storage handle (implementation detail; do not surface in user-facing output)
+- `yaml_field()` / `update_yaml_field()` - Structured field accessors (read/update one field at a time)
 - `cmd_*()` - Command handlers
 - `cmd_ready()`, `cmd_blocked()`, `cmd_ls()` - awk-based bulk listing with sorting
 

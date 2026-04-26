@@ -7,6 +7,7 @@
 - `create -d/--description` now emits a `## Goal` section, matching the lint handoff schema.
 - `ticket-edit` no longer supports whole-ticket replacement through `--from-file`, non-TTY editor scripts, or `@file` section sources; non-TTY callers must use structured commands and body-section flags instead of treating ticket markdown paths as an automation API.
 - `tk close <id>` now releases all held file claims for the ticket as a best-effort side effect (calls `tk complete` first; output silenced — audit stream is the canonical record). Redis being unreachable does not block close.
+- Documentation reframe (README, CLAUDE.md, AGENTS.md) no longer exposes internal storage details — drops references to "markdown files in `.tickets/`", YAML frontmatter, the VS Code Cmd+Click file-navigation hint, and `## Goal`-style header naming in the `tk edit` description. Body sections explicitly accept **markdown for formatting** (bullets, code blocks, links, emphasis); the on-disk storage format is now hidden so it can change without breaking agent workflows. `TICKETS_DIR` env var description reframed as "absolute path to the ticket store".
 
 ### Added
 - `deferred` status value for parking tickets that are valid but not being worked on now. Distinct from `closed` (done) — preserves the "valid work, not done" signal
