@@ -87,14 +87,22 @@ Commands:
   closed [--limit=N] [-a X] [-T X] List recently closed tickets (default 20, by mtime)
   show <id>                Display ticket
   add-note <id> [text]     Append timestamped note (or pipe via stdin)
+  set-goal <id> <value>    Replace the Goal section (value or @- for stdin)
+  set-design <id> <value>  Replace the Design section
+  set-acceptance <id> <value>      Replace the Acceptance Criteria section
+  set-testing <id> <value> Replace the Testing Obligations section
+  append-design <id> <value>       Append text to the Design section
+  append-acceptance <id> <value>   Append text to the Acceptance Criteria section
   super <cmd> [args]       Bypass plugins, run built-in command directly
+
+Body section values accept markdown for formatting (lists, code blocks,
+links, emphasis). Use @- to read the value from stdin.
 
 Plugins (tk-<cmd> or ticket-<cmd> in PATH):
   audit                  View the tk:<repo>:audit:claims Redis stream
   check                  Check who holds the claim on a file path (if anyone)
   claim                  Acquire a write claim on a file path via Redis
   complete               Release all file claims for a ticket (work-done signal)
-  edit                   Open or update ticket sections
   epics                  List epic tags used in the current repo's tickets
   force-release          Force-release a stuck file claim (recovery for crashed sessions)
   lint                   Validate tickets against the handoff schema
@@ -114,16 +122,6 @@ Plugin descriptions: comment '# tk-plugin: text' or --tk-describe flag
 
 Supports partial ID matching (e.g., 'tk show 5c4' matches 'nw-5c46')
 ```
-
-`tk edit` body-section flags mirror `tk create`: `-d`/`--description`/`--goal`
-updates the Goal section, `--design` updates Design, `--acceptance` updates
-Acceptance Criteria, and `--testing`/`--testing-obligations` updates Testing
-Obligations. Section values **accept markdown for formatting** — bullets,
-code blocks, links, and emphasis all work. Pass values inline or via `@-` for
-stdin. Only one body section flag may read from stdin in a single command.
-Automation should prefer `@-` for generated content and pass section values
-through these flags rather than attempting to write tickets directly. In
-non-TTY contexts, `tk edit <id>` requires section flags.
 
 ## Plugins
 

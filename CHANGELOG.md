@@ -30,10 +30,12 @@
 - `ticket-lint` pretty output now runs under macOS system Bash 3.2; Homebrew Bash is no longer required for the default lint path.
 - Renamed the writes-scope report plugin from `ticket-status` to `ticket-scope` so bundled plugins no longer shadow the built-in `tk status <id> <status>` mutator.
 
+### Removed
+- `ticket-edit` plugin removed entirely. The new built-in `tk set-goal` / `tk set-design` / `tk set-acceptance` / `tk set-testing` and `tk append-design` / `tk append-acceptance` commands replace it. Rationale: `ticket-edit` had a `$EDITOR`-based mode (TTY) that violated the backend-opacity directive — agents were nudged toward editing storage files directly. Removing the plugin closes that path; the field-level commands cover every use case without exposing storage. `tk edit <id>` now returns the standard "Unknown command" error. The `features/ticket_edit.feature` test file was removed; coverage moved to `features/ticket_set_section.feature` (12 scenarios).
+
 ### Plugins
 - ticket-complete 1.0.0: Explicit release of all file claims for a ticket. Companion to `tk close`'s auto-release; useful when you want to release claims but keep the ticket open (e.g., for review).
 - ticket-force-release 1.0.0: Stuck-claim recovery. Releases unconditionally and tags the audit stream with `event=force-release` to distinguish from normal flow.
-- ticket-edit 1.5.0: Open or update ticket sections; removed `--from-file`, non-TTY editor scripts, and `@file` section sources so automation updates tickets only through structured flags with inline or `@-` values
 - ticket-lint 0.5.1: Validate handoff schema; fixed Bash 3.2 compatibility for pretty output
 - ticket-ls 1.0.0: List tickets with optional filters (extracted from core); `ticket-list` symlink for alias
 - ticket-query 1.0.0: Output tickets as JSON, optionally filtered with jq (extracted from core)
