@@ -1,0 +1,125 @@
+#!/usr/bin/env bash
+# tk-plugin: Full-text search across ticket bodies (Design, Acceptance, descriptions)
+# tk-plugin-version: 0.1.0
+#
+# Fills the body-query gap that tk's built-in ticket-query leaves open:
+# ticket-query exports frontmatter only. This plugin searches body text.
+#
+# Usage:
+#   tk query-docs <pattern>              # JSON output
+#   tk query-docs <pattern> --pretty     # human-readable output
+#   tk query-docs --help
+#
+# Uses ripgrep when available (faster, regex), falls back to grep.
+# Python3 assembles JSON (built-in on macOS + Linux dev environments).
+# Non-ticket files in TICKETS_DIR (_sidebar.json, index.md, _*) are excluded.
+
+set -euo pipefail
+
+TICKETS_DIR="${TICKETS_DIR:-.tickets}"
+
+if [[ $# -eq 0 || "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+    cat <<'EOF' >&2
+tk query-docs — full-text search across ticket bodies
+
+Usage:
+    tk query-docs <pattern>            JSON output: [{id, title, status, file, matches:[{line, text}]}]
+    tk query-docs <pattern> --pretty   human-readable output
+
+Pattern is a literal string (case-insensitive). With ripgrep installed,
+regex is supported. Without matches, returns "[]" (JSON) or nothing (pretty).
+EOF
+    exit 0
+fi
+
+PATTERN="$1"
+PRETTY=0
+if [[ "${2:-}" == "--pretty" ]]; then
+    PRETTY=1
+fi
+
+if [[ ! -d "$TICKETS_DIR" ]]; then
+    echo "Error: $TICKETS_DIR does not exist" >&2
+    exit 1
+fi
+
+# Choose the searcher. rg preferred (faster, better glob support).
+if command -v rg >/dev/null 2>&1; then
+    RAW_HITS=$(rg -n -i --no-heading \
+        -g '*.md' -g '!index.md' -g '!_*' \
+        -- "$PATTERN" "$TICKETS_DIR" 2>/dev/null || true)
+else
+    # grep fallback. --include patterns vary slightly across implementations;
+    # use find + xargs for portability on BSD (macOS) vs GNU (Linux).
+    RAW_HITS=$(find "$TICKETS_DIR" -maxdepth 1 -type f -name '*.md' \
+        ! -name 'index.md' ! -name '_*' \
+        -print0 2>/dev/null | xargs -0 grep -n -i -- "$PATTERN" 2>/dev/null || true)
+fi
+
+# If nothing matched, return empty JSON / nothing.
+if [[ -z "$RAW_HITS" ]]; then
+    if [[ $PRETTY -eq 1 ]]; then
+        exit 0
+    fi
+    echo "[]"
+    exit 0
+fi
+
+# Emit structured output via Python for clean JSON assembly.
+# Pass hits via env var to avoid conflicting with the heredoc-stdin for the script.
+export TK_RAW_HITS="$RAW_HITS" PRETTY TICKETS_DIR
+python3 - <<'PY'
+import json, os, re
+
+raw = os.environ.get("TK_RAW_HITS", "")
+pretty = os.environ.get("PRETTY", "0") == "1"
+
+# Group hits by file path. Hit format: "path:line:text"
+by_file = {}
+for line in raw.splitlines():
+    if not line:
+        continue
+    # Split only on first two colons so text can contain colons.
+    parts = line.split(":", 2)
+    if len(parts) < 3:
+        continue
+    path, line_no, text = parts
+    try:
+        line_no_int = int(line_no)
+    except ValueError:
+        continue
+    by_file.setdefault(path, []).append({"line": line_no_int, "text": text})
+
+# Enrich each file with ticket metadata from frontmatter + title.
+results = []
+for path, matches in by_file.items():
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            content = f.read()
+    except Exception:
+        continue
+
+    id_m = re.search(r"^id:\s*(\S+)", content, re.M)
+    status_m = re.search(r"^status:\s*(\S+)", content, re.M)
+    title_m = re.search(r"^#\s+(.+)$", content, re.M)
+
+    results.append({
+        "id": id_m.group(1) if id_m else os.path.basename(path).removesuffix(".md"),
+        "title": title_m.group(1).strip() if title_m else "",
+        "status": status_m.group(1) if status_m else "unknown",
+        "file": path,
+        "matches": sorted(matches, key=lambda m: m["line"]),
+    })
+
+# Stable ordering: by ticket id.
+results.sort(key=lambda r: r["id"])
+
+if pretty:
+    for r in results:
+        print(f"{r['id']} [{r['status']}] — {r['title']}")
+        for m in r["matches"]:
+            print(f"    {m['line']}: {m['text']}")
+        print()
+else:
+    print(json.dumps(results, indent=2))
+PY
