@@ -1,8 +1,24 @@
 # ticket
 
+> **Status:** Opinionated personal fork of [`wedow/ticket`](https://github.com/wedow/ticket).
+> Upstream appears unmaintained as of April 2026; this fork is maintained as a working tool
+> and is **not accepting external contributions**. The upstream relationship is preserved so
+> cherry-picks can flow downstream if maintenance resumes — but no work from this fork is
+> sent back upstream.
+
 The git-backed issue tracker for AI agents. Rooted in the Unix Philosophy, `tk` is inspired by Joe Armstrong's [Minimal Viable Program](https://joearms.github.io/published/2014-06-25-minimal-viable-program.html) with additional quality of life features for managing and querying against complex issue dependency graphs.
 
 `tk` was written as a full replacement for [beads](https://github.com/steveyegge/beads). It shares many similar commands but without the need for keeping a SQLite file in sync or a rogue background daemon mangling your changes. It ships with a `migrate-beads` command to make this a smooth transition.
+
+## Why this fork
+
+A few opinions that shape this fork beyond what upstream provides:
+
+- **Agent-first.** Designed primarily for AI agents (Claude Code, Codex), not interactive humans. `CLAUDE.md` and `AGENTS.md` are first-class artifacts.
+- **Backend opacity.** Storage is an implementation detail. The direction of travel is for agents to interact only through the `tk` CLI — no `$EDITOR`, no file paths, no awareness of the underlying format. This frees the project to evolve the backend without breaking agent workflows.
+- **Redis-coordinated file claims.** Plugins (`tk claim`, `tk release`, `tk check`, `tk audit`) provide cross-agent file reservation so multiple agents working concurrently don't overwrite each other's edits. Lua-atomic acquire/release with a per-ticket index for enumeration.
+- **Consolidated plugin suite.** Plugins that previously lived across multiple repos (`ticket-claim`, `ticket-release`, `ticket-audit`, `ticket-check`, `ticket-epics`, `ticket-lint`, `ticket-scope`, `ticket-work-on`/`work-off`, `ticket-query-docs`, `ticket-sidebar`) all ship from `plugins/` in this tree.
+- **CI for verification, not distribution.** GitHub Actions run Behave tests and `shellcheck` on every push and pull request. No Homebrew tap, no AUR — install from source.
 
 Internally, tickets are markdown files with YAML frontmatter in `.tickets/`. The CLI treats that storage as an implementation detail for agents while preserving plain-text searchability.
 
