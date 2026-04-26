@@ -152,36 +152,6 @@ def step_lint_ready_ticket_exists(context, ticket_id, title):
     create_lint_ready_ticket(context, ticket_id, title)
 
 
-@given(r'an editor script that appends "(?P<text>[^"]+)"')
-def step_editor_script_appends(context, text):
-    """Create a non-interactive editor script for tk edit tests."""
-    script_path = Path(context.test_dir) / 'append-editor.sh'
-    script_path.write_text('#!/bin/sh\nprintf "\\n%s\\n" "$TK_EDIT_APPEND_TEXT" >> "$1"\n')
-    script_path.chmod(0o755)
-    context.editor_script = str(script_path)
-    context.editor_append_text = text
-
-
-@given(r'a replacement ticket file "(?P<filename>[^"]+)" with title "(?P<title>[^"]+)"')
-def step_replacement_ticket_file(context, filename, title):
-    """Create a source file for tk edit --from-file tests."""
-    replacement_path = Path(context.test_dir) / filename
-    replacement_path.write_text(f'''---
-id: edit-0001
-status: open
-deps: []
-links: []
-created: 2024-01-01T00:00:00Z
-type: task
-priority: 2
----
-# {title}
-
-Replacement body
-''')
-    context.replacement_ticket_file = str(replacement_path)
-
-
 @given(r'ticket "(?P<ticket_id>[^"]+)" has status "(?P<status>[^"]+)"')
 def step_ticket_has_status(context, ticket_id, status):
     """Set ticket status."""
@@ -323,17 +293,16 @@ def step_run_command_non_tty(context, command):
     context.returncode = result.returncode
 
 
-@when(r'I run "(?P<command>(?:[^"\\]|\\.)+)" in non-TTY mode with EDITOR set to that script')
-def step_run_command_non_tty_with_editor(context, command):
-    """Run a command in non-TTY mode with an explicit editor script."""
+@when(r'I run "(?P<command>(?:[^"\\]|\\.)+)" in non-TTY mode with EDITOR set to "(?P<editor>[^"]+)"')
+def step_run_command_non_tty_with_editor_value(context, command, editor):
+    """Run a command in non-TTY mode with EDITOR set."""
     command = command.replace('\\"', '"')
 
     ticket_script = get_ticket_script(context)
     cmd = command.replace('ticket ', f'{ticket_script} ', 1)
 
     env = os.environ.copy()
-    env['EDITOR'] = context.editor_script
-    env['TK_EDIT_APPEND_TEXT'] = context.editor_append_text
+    env['EDITOR'] = editor
     if hasattr(context, 'plugin_dir'):
         env['PATH'] = context.plugin_dir + ':' + env.get('PATH', '')
 
@@ -442,6 +411,37 @@ def step_run_command(context, command):
     # If this was a create command, track the created ticket ID
     if 'ticket create' in command and result.returncode == 0:
         context.last_created_id = result.stdout.strip()
+
+
+@when(r'I run "(?P<command>(?:[^"\\]|\\.)+)" with stdin "(?P<stdin_text>[^"]*)"')
+def step_run_command_with_stdin(context, command, stdin_text):
+    """Run a ticket CLI command with provided stdin content."""
+    command = command.replace('\\"', '"')
+
+    ticket_script = get_ticket_script(context)
+    cmd = command.replace('ticket ', f'{ticket_script} ', 1)
+
+    cwd = getattr(context, 'working_dir', context.test_dir)
+
+    env = os.environ.copy()
+    if hasattr(context, 'plugin_dir'):
+        env['PATH'] = context.plugin_dir + ':' + env.get('PATH', '')
+
+    result = subprocess.run(
+        cmd,
+        shell=True,
+        cwd=cwd,
+        capture_output=True,
+        text=True,
+        input=stdin_text.replace('\\n', '\n'),
+        env=env
+    )
+
+    context.result = result
+    context.stdout = result.stdout.strip()
+    context.stderr = result.stderr.strip()
+    context.returncode = result.returncode
+    context.last_command = command
 
 
 @when(r'I lint the created ticket')

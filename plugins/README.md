@@ -39,21 +39,23 @@ Use `$TK_SCRIPT super <cmd>` to call built-ins without recursing into plugins:
 
 ## Non-Interactive Editing
 
-`tk edit <id>` opens `$EDITOR` in an interactive terminal. In non-TTY
-automation, it prints the ticket path unless `EDITOR` is explicitly set; agents
-can point `EDITOR` at an executable script to make structured edits while still
-going through the ticket command surface:
+`tk edit <id>` opens `$EDITOR` only in an interactive terminal. In non-TTY
+automation, callers must pass section flags. The plugin does not expose the
+ticket file path or run editor scripts as an automation API.
+
+For handoff body updates, prefer section flags so automation does not need to
+know or assemble the underlying ticket file format:
 
 ```bash
-EDITOR=/tmp/update-ticket-body tk edit abc-1234
+tk edit abc-1234 --design "Use the existing parser path"
+printf '%s\n' "- Parser accepts the new flag" | tk edit abc-1234 --acceptance @-
 ```
 
-For deterministic generated content, prefer `--from-file` over editor-script or
-PTY workarounds:
-
-```bash
-tk edit abc-1234 --from-file /tmp/ticket-body.md
-```
+Section flags mirror `tk create`: `-d`/`--description`/`--goal`, `--design`,
+`--acceptance`, and `--testing`/`--testing-obligations`. Values may be inline
+text or `@-` for stdin. Only one section flag may read from stdin per command.
+Generated automation content should prefer `@-`. Do not create temporary ticket
+markdown or section files for replacement.
 
 ## Packaging
 

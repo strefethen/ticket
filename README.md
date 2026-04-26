@@ -4,7 +4,7 @@ The git-backed issue tracker for AI agents. Rooted in the Unix Philosophy, `tk` 
 
 `tk` was written as a full replacement for [beads](https://github.com/steveyegge/beads). It shares many similar commands but without the need for keeping a SQLite file in sync or a rogue background daemon mangling your changes. It ships with a `migrate-beads` command to make this a smooth transition.
 
-Tickets are markdown files with YAML frontmatter in `.tickets/`. This allows AI agents to easily search them for relevant content without dumping ten thousand character JSONL lines into their context window.
+Internally, tickets are markdown files with YAML frontmatter in `.tickets/`. The CLI treats that storage as an implementation detail for agents while preserving plain-text searchability.
 
 Using ticket IDs as file names also allows IDEs to quickly navigate to the ticket for you. For example, you might run `git log` in your terminal and see something like:
 
@@ -94,7 +94,8 @@ Commands:
   super <cmd> [args]       Bypass plugins, run built-in command directly
 
 Official plugins in this repo:
-  edit <id> [--from-file PATH]  Open ticket in $EDITOR or replace from PATH
+  edit <id> [--goal TEXT] [--design TEXT] [--acceptance TEXT] [--testing TEXT]
+                           Open ticket interactively or update body sections
   lint <id>                Validate a ticket against the handoff schema
   ls|list [--status=X] [-a X] [-T X]   List tickets
   query [jq-filter]        Output tickets as JSON, optionally filtered (requires jq)
@@ -104,6 +105,16 @@ Official plugins in this repo:
 Searches parent directories for .tickets/ (override with TICKETS_DIR env var)
 Supports partial ID matching (e.g., 'tk show 5c4' matches 'nw-5c46')
 ```
+
+`tk edit` body-section flags mirror `tk create`: `-d`/`--description`/`--goal`
+updates `## Goal`, `--design` updates `## Design`, `--acceptance` updates
+`## Acceptance Criteria`, and `--testing`/`--testing-obligations` updates
+`## Testing Obligations`. Section values may be inline text or `@-` for stdin.
+Only one body section flag may read from stdin in a single command.
+Automation should prefer `@-` for generated content and should not assemble or
+replace complete ticket markdown files.
+In non-TTY contexts, `tk edit <id>` requires section flags; it does not reveal
+the underlying ticket file path or run an editor script as an automation API.
 
 ## Plugins
 
