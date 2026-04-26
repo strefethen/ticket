@@ -1612,6 +1612,14 @@ if [[ $_tk_super -eq 0 && -n "${1:-}" && "${1:-}" != "help" && "${1:-}" != "--he
                     exit 1
                 fi
                 export TICKETS_DIR
+                # Compute and export TK_REPO so plugins (especially the
+                # Redis-coordination ones) don't have to derive the repo
+                # namespace from TICKETS_DIR's path themselves. Honors a
+                # user-set TK_REPO override.
+                if [[ -z "${TK_REPO:-}" ]]; then
+                    TK_REPO=$(basename "$(dirname "$(cd "$TICKETS_DIR" 2>/dev/null && pwd)")")
+                fi
+                export TK_REPO
             fi
             export TK_SCRIPT="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
             shift

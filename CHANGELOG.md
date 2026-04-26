@@ -25,6 +25,7 @@
 - `tk force-release <path>` plugin — recovery for stuck claims (crashed sessions, abandoned tickets). Bypasses ownership check; tags audit event as `force-release` so recovery operations are distinguishable from normal release flow.
 - `tk set-goal`, `tk set-design`, `tk set-acceptance`, `tk set-testing` — replace body sections via CLI flags without invoking `$EDITOR`. Section values accept markdown formatting (lists, code blocks, links, emphasis); pass values inline or via `@-` to read from stdin.
 - `tk append-design`, `tk append-acceptance` — additive variants that append text to existing sections (or create the section if missing). Same value conventions as set-* commands.
+- `TK_REPO` env var now exported automatically to plugins via `tk` dispatch. The Redis-coordination plugins (`tk claim`, `tk release`, `tk check`, `tk audit`, `tk complete`, `tk force-release`) already consult `TK_REPO` first, falling back to deriving it from `TICKETS_DIR`'s parent. With this change, the central script computes the value once and passes it via env, rather than each plugin recomputing. User-set `TK_REPO` is honored as override.
 
 ### Fixed
 - `ticket-lint` pretty output now runs under macOS system Bash 3.2; Homebrew Bash is no longer required for the default lint path.
