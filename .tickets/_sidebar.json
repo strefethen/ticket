@@ -5,20 +5,11 @@
       "slug":  "epics",
       "subsections": [
         {
-          "title": "maintenance (1)",
-          "slug":  "epics/maintenance",
-          "items": [
-            { "title": "tlf-pixm — Initialize tk tickets for ticket-local-fixes", "slug": "tlf-pixm", "priority": 3, "blocked_by": [] }
-          ]
-        },
-        {
-          "title": "tk-tooling (5)",
+          "title": "tk-tooling (3)",
           "slug":  "epics/tk-tooling",
           "items": [
             { "title": "tlf-50et — Warn when writes: path has paired test file not in Testing Obligations", "slug": "tlf-50et", "priority": 3, "blocked_by": [] },
-            { "title": "tlf-aapz — Add machine-readable closure metadata to tk close", "slug": "tlf-aapz", "priority": 3, "blocked_by": [] },
             { "title": "tlf-p8g4 — Promote scope-expansion from note-pattern to first-class status", "slug": "tlf-p8g4", "priority": 3, "blocked_by": [] },
-            { "title": "tlf-tvm6 — Extend tk status with --stage flag and declared-but-not-modified check", "slug": "tlf-tvm6", "priority": 3, "blocked_by": [] },
             { "title": "tlf-ybi2 — Show tier / plan / parent / children / epic block in tk show", "slug": "tlf-ybi2", "priority": 3, "blocked_by": [] }
           ]
         }
@@ -41,11 +32,11 @@
     }
   ],
   "summary": {
-    "total": 6,
+    "total": 23,
     "ready": 3,
     "in_progress": 0,
     "blocked": 0,
     "deferred": 0,
-    "closed": 3
+    "closed": 20
   }
 }
