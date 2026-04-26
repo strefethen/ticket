@@ -16,20 +16,9 @@ VS Code allows you to Ctrl+Click or Cmd+Click the ID and jump directly to the fi
 
 ## Install
 
-**Homebrew (macOS/Linux):**
-```bash
-brew tap wedow/tools
-brew install ticket
-```
-
-**Arch Linux (AUR):**
-```bash
-yay -S ticket  # or paru, etc.
-```
-
 **From source (auto-updates on git pull):**
 ```bash
-git clone https://github.com/wedow/ticket.git
+git clone https://github.com/strefethen/ticket.git
 cd ticket && ln -s "$PWD/ticket" ~/.local/bin/tk
 ```
 

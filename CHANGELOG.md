@@ -17,8 +17,6 @@
 - `TICKETS_DIR` and `TK_SCRIPT` environment variables exported for plugins
 - `help` command lists installed plugins with descriptions
 - Plugin metadata: `# tk-plugin:` comment for scripts, `--tk-describe` flag for binaries
-- Multi-package distribution: `ticket-core`, `ticket-extras`, and individual plugin packages
-- CI scripts for publishing to Homebrew tap and AUR
 - `create --goal`, `create --testing`, and `create --testing-obligations` flags for generating lint-required handoff sections directly.
 - `ticket-edit` body-section flags (`--goal`, `--design`, `--acceptance`, `--testing`) with inline and `@-` stdin values for non-interactive section updates.
 
