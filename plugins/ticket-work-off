@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# tk-plugin: Clear the active ticket for this repo (removes .tickets/.current)
+# tk-plugin: Clear the active ticket for this repo
 # tk-plugin-version: 0.1.0
 #
 # Usage: tk work-off

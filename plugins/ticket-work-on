@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# tk-plugin: Set the active ticket for this repo (writes .tickets/.current)
+# tk-plugin: Set the active ticket for this repo
 # tk-plugin-version: 0.1.0
 #
 # Usage: tk work-on <ticket-id>

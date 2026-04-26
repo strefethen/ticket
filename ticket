@@ -36,9 +36,9 @@ init_tickets_dir() {
     [[ " $WRITE_COMMANDS " == *" $cmd "* ]] && is_write_cmd=1
 
     if TICKETS_DIR=$(find_tickets_dir); then
-        # For read commands, verify the directory exists
+        # For read commands, verify the storage exists
         if [[ $is_write_cmd -eq 0 ]] && [[ ! -d "$TICKETS_DIR" ]]; then
-            echo "Error: tickets directory '$TICKETS_DIR' does not exist" >&2
+            echo "Error: ticket store not initialized" >&2
             return 1
         fi
         return 0
@@ -50,8 +50,8 @@ init_tickets_dir() {
         return 0
     fi
 
-    echo "Error: no .tickets directory found (searched parent directories)" >&2
-    echo "Run 'tk create' to initialize, or set TICKETS_DIR env var" >&2
+    echo "Error: no ticket store found in this directory tree" >&2
+    echo "Run 'tk create' to initialize" >&2
     return 1
 }
 
@@ -1414,12 +1414,10 @@ EOF
 
     cat << EOF
 
-Use 'super' to bypass plugins. Plugins receive TICKETS_DIR and TK_SCRIPT
-env vars; use '\$TK_SCRIPT super <cmd>' to call built-ins.
+Use 'super' to bypass plugins. Plugin authoring: see plugins/README.md.
 
 Plugin descriptions: comment '# tk-plugin: text' or --tk-describe flag
 
-Tickets stored as markdown files in .tickets/
 Supports partial ID matching (e.g., '$cmd show 5c4' matches 'nw-5c46')
 EOF
 }
@@ -1447,7 +1445,7 @@ if [[ $_tk_super -eq 0 && -n "${1:-}" && "${1:-}" != "help" && "${1:-}" != "--he
             fi
             if [[ -n "${TICKETS_DIR:-}" ]]; then
                 if [[ ! -d "$TICKETS_DIR" ]]; then
-                    echo "Error: tickets directory '$TICKETS_DIR' does not exist" >&2
+                    echo "Error: ticket store not initialized" >&2
                     exit 1
                 fi
                 export TICKETS_DIR

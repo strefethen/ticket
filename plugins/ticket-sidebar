@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# tk-plugin: Generate _sidebar.json from .tickets/*.md for the fullstack-starter docs engine
+# tk-plugin: Generate _sidebar.json for the fullstack-starter docs engine
 # tk-plugin-version: 0.13.0
 #
 # Scans every .md ticket in TICKETS_DIR, groups by computed status
