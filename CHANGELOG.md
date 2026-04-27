@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-04-26
+
+First release on the `strefethen/ticket` fork. Establishes the agent-first
+opinion: storage is hidden behind the CLI, file claims coordinate work
+across Claude and Codex, and field-level mutation commands replace any
+need for `$EDITOR`.
+
 ### Changed
 - Extracted `edit`, `ls`, `query`, and `migrate-beads` commands to plugins (ticket-extras)
 - `create -d/--description` now emits a `## Goal` section, matching the lint handoff schema.
