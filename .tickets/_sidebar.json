@@ -5,6 +5,13 @@
       "slug":  "epics",
       "subsections": [
         {
+          "title": "test (1)",
+          "slug":  "epics/test",
+          "items": [
+            { "title": "tic-t42k — pre-commit hook drift test", "slug": "tic-t42k", "priority": 4, "blocked_by": [] }
+          ]
+        },
+        {
           "title": "tk-tooling (3)",
           "slug":  "epics/tk-tooling",
           "items": [
@@ -27,13 +34,20 @@
             { "title": "tlf-p8g4 — Promote scope-expansion from note-pattern to first-class status", "slug": "tlf-p8g4", "priority": 3, "blocked_by": [] },
             { "title": "tlf-ybi2 — Show tier / plan / parent / children / epic block in tk show", "slug": "tlf-ybi2", "priority": 3, "blocked_by": [] }
           ]
+        },
+        {
+          "title": "P4 (1)",
+          "slug":  "ready/P4",
+          "items": [
+            { "title": "tic-t42k — pre-commit hook drift test", "slug": "tic-t42k", "priority": 4, "blocked_by": [] }
+          ]
         }
       ]
     }
   ],
   "summary": {
-    "total": 23,
-    "ready": 3,
+    "total": 24,
+    "ready": 4,
     "in_progress": 0,
     "blocked": 0,
     "deferred": 0,
