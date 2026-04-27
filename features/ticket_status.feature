@@ -99,6 +99,34 @@ Feature: Ticket Status Management
     Then the command should succeed
     And ticket "test-0001" should contain "Deferred: waiting on API redesign"
 
+  Scenario: Pause command sets status to paused
+    When I run "ticket pause test-0001"
+    Then the command should succeed
+    And the output should be "Updated test-0001 -> paused"
+    And ticket "test-0001" should have field "status" with value "paused"
+
+  Scenario: Pause command with no id
+    When I run "ticket pause"
+    Then the command should fail
+    And the output should contain "Usage:"
+    And the output should contain "pause <id>"
+
+  Scenario: Pause with -r reason appends a labelled note
+    When I run "ticket pause test-0001 -r 'awaiting scope clarification on nested epics'"
+    Then the command should succeed
+    And ticket "test-0001" should contain "Paused: awaiting scope clarification on nested epics"
+
+  Scenario: Reopen command works on paused ticket
+    Given ticket "test-0001" has status "paused"
+    When I run "ticket reopen test-0001"
+    Then the command should succeed
+    And ticket "test-0001" should have field "status" with value "open"
+
+  Scenario: Generic status command accepts paused
+    When I run "ticket status test-0001 paused"
+    Then the command should succeed
+    And ticket "test-0001" should have field "status" with value "paused"
+
   Scenario: Reopen with -r reason appends a labelled note
     Given ticket "test-0001" has status "closed"
     When I run "ticket reopen test-0001 -r 'regression found'"

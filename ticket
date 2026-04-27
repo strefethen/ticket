@@ -272,7 +272,12 @@ cmd_create() {
 }
 
 # Valid statuses
-VALID_STATUSES="open in_progress closed deferred"
+#   paused — work in progress that has hit a scope boundary or other
+#   blocker requiring human input (e.g., scope expansion request, design
+#   clarification needed). Distinct from `deferred` (intentionally parked
+#   to come back to later) — paused implies the agent was actively working
+#   and has stopped pending guidance.
+VALID_STATUSES="open in_progress closed deferred paused"
 
 validate_status() {
     local status="$1"
@@ -296,6 +301,7 @@ _append_status_note() {
     case "$status" in
         closed)      label="Closed" ;;
         deferred)    label="Deferred" ;;
+        paused)      label="Paused" ;;
         open)        label="Reopened" ;;
         in_progress) label="Started" ;;
         *)           label="Status -> $status" ;;
@@ -390,6 +396,15 @@ cmd_defer() {
     fi
     local id="$1"; shift
     cmd_status "$id" "deferred" "$@"
+}
+
+cmd_pause() {
+    if [[ $# -lt 1 ]]; then
+        echo "Usage: $(basename "$0") pause <id> [-r reason]" >&2
+        return 1
+    fi
+    local id="$1"; shift
+    cmd_status "$id" "paused" "$@"
 }
 
 cmd_reopen() {
@@ -1539,8 +1554,9 @@ Commands:
   start <id> [-r reason]   Set status to in_progress (optional reason note)
   close <id> [-r reason]   Set status to closed (optional reason note)
   defer <id> [-r reason]   Set status to deferred (optional reason note)
+  pause <id> [-r reason]   Set status to paused — agent stopped pending human input
   reopen <id> [-r reason]  Set status to open (optional reason note)
-  status <id> <status> [-r reason]  Update status (open|in_progress|closed|deferred)
+  status <id> <status> [-r reason]  Update status (open|in_progress|closed|deferred|paused)
   dep <id> <dep-id>        Add dependency (id depends on dep-id)
   dep tree [--full] <id>   Show dependency tree (--full disables dedup)
   dep cycle                Find dependency cycles in open tickets
@@ -1640,6 +1656,7 @@ case "${1:-help}" in
     start)  shift; cmd_start "$@" ;;
     close)  shift; cmd_close "$@" ;;
     defer)  shift; cmd_defer "$@" ;;
+    pause)  shift; cmd_pause "$@" ;;
     reopen) shift; cmd_reopen "$@" ;;
     status) shift; cmd_status "$@" ;;
     dep)    shift; cmd_dep "$@" ;;

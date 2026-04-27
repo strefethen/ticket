@@ -4,7 +4,7 @@
 
 Historical archive of closed tickets for this doc set. Regenerated on each `tk sidebar` run. Active work lives in the sidebar and [tree index](./index.md).
 
-Total: **27**
+Total: **29**
 
 ## [tlf-tvm6](./tlf-tvm6.md) — Extend tk status with --stage flag and declared-but-not-modified check
 
@@ -23,6 +23,12 @@ Total: **27**
 - **Type**: feature
 - **Priority**: P3
 - **Close reason**: Landed in ticket-local-fixes@cd50848 — ticket-lint 0.5.0 adds closure-reason check: closed tickets warn if their close reason lacks a commit-hash-shaped substring (lighter-interim path per Design). Verified via synthetic fixtures (4 scenarios), fullstack-starter corpus (46 closures, mix of pass/warn as designed), and ticket-local-fixes (tlf-pixm passes with hash 55159f1).
+
+## [tlf-50et](./tlf-50et.md) — Warn when writes: path has paired test file not in Testing Obligations
+
+- **Type**: feature
+- **Priority**: P3
+- **Close reason**: Per-language test-file pairing landed in ticket-lint 0.6.0 as additive WARN-level check. 5 conventions encoded (TS/JS, Swift, Go, Python, Rust). 3 Behave scenarios pass.
 
 ## [tic-zlj5](./tic-zlj5.md) — Agent coordination — bulletproof Redis claims across Claude + Codex
 
@@ -137,6 +143,12 @@ Total: **27**
 - **Type**: chore
 - **Priority**: P4
 - **Close reason**: smoke test of writes-tests check
+
+## [tic-3a3k](./tic-3a3k.md) — pause smoke test
+
+- **Type**: chore
+- **Priority**: P4
+- **Close reason**: smoke test
 
 ## [tic-2shj](./tic-2shj.md) — tk force-release plugin — recovery for stuck claims
 

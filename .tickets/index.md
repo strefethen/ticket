@@ -4,26 +4,24 @@
 
 ## Epics
 
-### tk-tooling (3)
+### tk-tooling (2)
 
-- 🟢 [tlf-50et — Warn when writes: path has paired test file not in Testing Obligations](./tlf-50et.md)
 - 🟢 [tlf-p8g4 — Promote scope-expansion from note-pattern to first-class status](./tlf-p8g4.md)
 - 🟢 [tlf-ybi2 — Show tier / plan / parent / children / epic block in tk show](./tlf-ybi2.md)
 
 ## Ready
 
-### P3 (2)
+### P3 (1)
 
-- 🟢 [tlf-p8g4 — Promote scope-expansion from note-pattern to first-class status](./tlf-p8g4.md)
 - 🟢 [tlf-ybi2 — Show tier / plan / parent / children / epic block in tk show](./tlf-ybi2.md)
 
 ## In Progress
 
 ### P3 (1)
 
-- 🟢 [tlf-50et — Warn when writes: path has paired test file not in Testing Obligations](./tlf-50et.md)
+- 🟢 [tlf-p8g4 — Promote scope-expansion from note-pattern to first-class status](./tlf-p8g4.md)
 
 ---
 
-**[27 closed tickets →](./closed-tickets.md)**
+**[29 closed tickets →](./closed-tickets.md)**
 
