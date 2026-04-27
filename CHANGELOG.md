@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Added
+- `scripts/git-hooks/pre-commit` — runs `tk sidebar` before each commit and stages any regenerated artifacts (`_sidebar.json`, `index.md`, `closed-tickets.md`). Activate with `git config core.hooksPath scripts/git-hooks` once per clone. Bypass with `git commit --no-verify`. Fires for any agent (Claude, Codex, human) since git hooks are agent-agnostic.
+
 ## [0.4.0] - 2026-04-26
 
 First release on the `strefethen/ticket` fork. Establishes the agent-first

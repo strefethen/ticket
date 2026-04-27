@@ -28,6 +28,9 @@ Ticket IDs (e.g., `nw-5c46`) appear in commit messages and `tk` output as the du
 ```bash
 git clone https://github.com/strefethen/ticket.git
 cd ticket && ln -s "$PWD/ticket" ~/.local/bin/tk
+
+# Activate the bundled pre-commit hook (regens sidebar artifacts on commit)
+git config core.hooksPath scripts/git-hooks
 ```
 
 **Or** just copy `ticket` to somewhere in your PATH.

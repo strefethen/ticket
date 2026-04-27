@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+# pre-commit — regenerate ticket sidebar artifacts before each commit.
+#
+# Runs `tk sidebar` to refresh:
+#   .tickets/_sidebar.json
+#   .tickets/index.md
+#   .tickets/closed-tickets.md
+#
+# If any of those changed as a result, stage them so they land in the
+# current commit and stay in sync with the ticket state.
+#
+# Bypass: `git commit --no-verify`.
+#
+# Activate (once per clone):
+#   git config core.hooksPath scripts/git-hooks
+
+set -e
+
+# Skip if tk isn't on PATH (e.g., a contributor without the install).
+if ! command -v tk >/dev/null 2>&1; then
+    exit 0
+fi
+
+# Skip if there's no .tickets/ in this repo (not every repo using these
+# hooks may have ticket state — defensive).
+repo_root=$(git rev-parse --show-toplevel)
+if [[ ! -d "$repo_root/.tickets" ]]; then
+    exit 0
+fi
+
+# Regenerate. Errors abort the commit so drift can't slip through silently.
+if ! tk sidebar >/dev/null 2>&1; then
+    echo "pre-commit: tk sidebar failed — aborting commit" >&2
+    echo "pre-commit: run 'tk sidebar' manually to see the error, or" >&2
+    echo "pre-commit: bypass with 'git commit --no-verify' if intentional" >&2
+    exit 1
+fi
+
+# Stage any sidebar artifacts whose content actually changed.
+changed=()
+for f in .tickets/_sidebar.json .tickets/index.md .tickets/closed-tickets.md; do
+    if [[ -f "$repo_root/$f" ]]; then
+        # `git diff --quiet` exits non-zero when there's a diff vs the index.
+        if ! git -C "$repo_root" diff --quiet -- "$f" 2>/dev/null; then
+            git -C "$repo_root" add -- "$f"
+            changed+=("$f")
+        fi
+    fi
+done
+
+if (( ${#changed[@]} > 0 )); then
+    echo "pre-commit: regenerated ticket sidebar artifacts:" >&2
+    for f in "${changed[@]}"; do
+        echo "  + $f" >&2
+    done
+fi
+
+exit 0
