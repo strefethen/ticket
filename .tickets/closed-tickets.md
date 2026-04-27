@@ -4,7 +4,7 @@
 
 Historical archive of closed tickets for this doc set. Regenerated on each `tk sidebar` run. Active work lives in the sidebar and [tree index](./index.md).
 
-Total: **29**
+Total: **34**
 
 ## [tlf-tvm6](./tlf-tvm6.md) — Extend tk status with --stage flag and declared-but-not-modified check
 
@@ -17,6 +17,12 @@ Total: **29**
 - **Type**: chore
 - **Priority**: P3
 - **Close reason**: Bootstrap proof-of-life served its purpose. .tickets/ is in active use: 4 tk-tooling tickets migrated from fullstack-starter (ticket-local-fixes@55159f1), tlf-tvm6 implemented (ticket-local-fixes@ca716c3), and multiple sidebar regenerations exercising the pipeline end-to-end. No further action needed; this ticket was a one-time initializer.
+
+## [tlf-p8g4](./tlf-p8g4.md) — Promote scope-expansion from note-pattern to first-class status
+
+- **Type**: task
+- **Priority**: P3
+- **Close reason**: First-class status + command landed; mirrors defer pattern. 157 scenarios pass.
 
 ## [tlf-aapz](./tlf-aapz.md) — Add machine-readable closure metadata to tk close
 
@@ -54,6 +60,18 @@ Total: **29**
 - **Priority**: P1
 - **Close reason**: Smoke test seeded Redis with 100s TTL, fired hook, observed 300s TTL after — heartbeat working as designed. Wired into ~/.claude/settings.json with diff-only-appends.
 
+## [tic-u8bp](./tic-u8bp.md) — Lineage orphan
+
+- **Type**: chore
+- **Priority**: P4
+- **Close reason**: smoke
+
+## [tic-u5w7](./tic-u5w7.md) — Lineage demo child A
+
+- **Type**: task
+- **Priority**: P4
+- **Close reason**: smoke
+
 ## [tic-u5fa](./tic-u5fa.md) — Cross-agent integration test — Claude vs Codex conflict detection
 
 - **Type**: task
@@ -77,6 +95,12 @@ Total: **29**
 - **Type**: chore
 - **Priority**: P4
 - **Close reason**: smoke test of phase 3 set/append commands
+
+## [tic-r5ac](./tic-r5ac.md) — Lineage demo parent
+
+- **Type**: epic
+- **Priority**: P4
+- **Close reason**: smoke
 
 ## [tic-pa3a](./tic-pa3a.md) — Remove ticket-edit plugin
 
@@ -113,6 +137,12 @@ Total: **29**
 - **Type**: task
 - **Priority**: P2
 - **Close reason**: All target docs (README, CLAUDE.md, AGENTS.md) clean of storage-leak language. Markdown-as-content-format clarification preserved throughout.
+
+## [tic-hq1s](./tic-hq1s.md) — Lineage demo child B
+
+- **Type**: task
+- **Priority**: P4
+- **Close reason**: smoke
 
 ## [tic-fypi](./tic-fypi.md) — Disable broken release-on-Stop in Claude settings (P0)
 

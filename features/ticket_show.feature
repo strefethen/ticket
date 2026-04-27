@@ -80,6 +80,42 @@ Feature: Ticket Show
     Then the command should fail
     And the output should contain "Error: ticket 'nonexistent' not found"
 
+  Scenario: Show emits a parent line in the lineage block
+    Given a ticket exists with ID "show-001" and title "Lineage parent"
+    And a ticket exists with ID "show-002" and title "Lineage child" with parent "show-001"
+    When I run "ticket show show-002"
+    Then the command should succeed
+    And the output should contain "parent:   show-001 — Lineage parent"
+
+  Scenario: Show emits a children line in the lineage block
+    Given a ticket exists with ID "show-001" and title "Has children"
+    And a ticket exists with ID "show-002" and title "First child" with parent "show-001"
+    And a ticket exists with ID "show-003" and title "Second child" with parent "show-001"
+    When I run "ticket show show-001"
+    Then the command should succeed
+    And the output should contain "children: show-002, show-003"
+
+  Scenario: Show emits an epic line in the lineage block
+    Given a lint-ready ticket exists with ID "show-epic-001" and title "Epic-tagged ticket"
+    When I run "ticket show show-epic-001"
+    Then the command should succeed
+    And the output should contain "epic:     test"
+
+  Scenario: Show emits a plan line in the lineage block
+    Given a lint-ready ticket exists with ID "show-plan-001" and title "Plan-bearing ticket"
+    When I run "ticket show show-plan-001"
+    Then the command should succeed
+    And the output should contain "plan:     plans/current/demo.md"
+
+  Scenario: Show emits no lineage block when ticket has no parent/children/plan/epic
+    Given a ticket exists with ID "show-bare-001" and title "Bare ticket"
+    When I run "ticket show show-bare-001"
+    Then the command should succeed
+    And the output should not contain "parent:   "
+    And the output should not contain "children: "
+    And the output should not contain "epic:     "
+    And the output should not contain "plan:     "
+
   Scenario: Show with partial ID
     Given a ticket exists with ID "show-001" and title "Test ticket"
     When I run "ticket show 001"

@@ -4,14 +4,7 @@
 
 ## Epics
 
-### tk-tooling (2)
-
-- 🟢 [tlf-p8g4 — Promote scope-expansion from note-pattern to first-class status](./tlf-p8g4.md)
-- 🟢 [tlf-ybi2 — Show tier / plan / parent / children / epic block in tk show](./tlf-ybi2.md)
-
-## Ready
-
-### P3 (1)
+### tk-tooling (1)
 
 - 🟢 [tlf-ybi2 — Show tier / plan / parent / children / epic block in tk show](./tlf-ybi2.md)
 
@@ -19,9 +12,9 @@
 
 ### P3 (1)
 
-- 🟢 [tlf-p8g4 — Promote scope-expansion from note-pattern to first-class status](./tlf-p8g4.md)
+- 🟢 [tlf-ybi2 — Show tier / plan / parent / children / epic block in tk show](./tlf-ybi2.md)
 
 ---
 
-**[29 closed tickets →](./closed-tickets.md)**
+**[34 closed tickets →](./closed-tickets.md)**
 

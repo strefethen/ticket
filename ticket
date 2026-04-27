@@ -1182,15 +1182,34 @@ cmd_show() {
     # First pass: collect all ticket metadata
     FNR==1 {
         if (prev_file) store()
-        id=""; status=""; title=""; deps=""; links=""; parent=""; in_front=0
+        id=""; status=""; title=""; deps=""; links=""; parent=""; plan=""; epic=""; in_front=0; in_tags=0
         prev_file=FILENAME
     }
-    /^---$/ { in_front = !in_front; next }
+    /^---$/ { in_front = !in_front; in_tags = 0; next }
     in_front && /^id:/ { id = $2 }
     in_front && /^status:/ { status = $2 }
     in_front && /^deps:/ { deps = $2; gsub(/[\[\] ]/, "", deps) }
     in_front && /^links:/ { links = $2; gsub(/[\[\] ]/, "", links) }
     in_front && /^parent:/ { parent = $2 }
+    in_front && /^plan:/ { plan = $2 }
+    # Tags can be inline ("tags: [a, epic:b]") or multiline ("tags:\n  - a\n  - epic:b").
+    # Capture the first epic:* value.
+    in_front && /^tags:/ {
+        line = $0; sub(/^tags:[ ]*/, "", line)
+        if (match(line, /epic:[A-Za-z0-9_-]+/)) {
+            epic = substr(line, RSTART + 5, RLENGTH - 5)
+        }
+        in_tags = 1
+        next
+    }
+    in_front && in_tags && /^  - / {
+        line = $0; sub(/^  - */, "", line)
+        if (epic == "" && match(line, /epic:[A-Za-z0-9_-]+/)) {
+            epic = substr(line, RSTART + 5, RLENGTH - 5)
+        }
+        next
+    }
+    in_front && /^[a-z]/ { in_tags = 0 }
     !in_front && /^# / && title == "" { title = substr($0, 3) }
 
     function store() {
@@ -1200,6 +1219,8 @@ cmd_show() {
             all_deps[id] = deps
             all_links[id] = links
             parents[id] = parent
+            plans[id] = plan
+            epics[id] = epic
         }
     }
 
@@ -1225,6 +1246,37 @@ cmd_show() {
                 }
             }
         }
+
+        # Lineage block — compact summary of parent/children/plan/epic
+        # at the top, before the ticket file dumps. Only fields with values
+        # are shown; an empty lineage prints nothing.
+        lineage_emitted = 0
+        if (parents[target] != "") {
+            ptitle = titles[parents[target]]
+            if (ptitle != "") {
+                printf "parent:   %s — %s\n", parents[target], ptitle
+            } else {
+                printf "parent:   %s\n", parents[target]
+            }
+            lineage_emitted = 1
+        }
+        if (children_count > 0) {
+            printf "children: "
+            for (i = 1; i <= children_count; i++) {
+                printf "%s%s", children[i], (i < children_count ? ", " : "")
+            }
+            printf "\n"
+            lineage_emitted = 1
+        }
+        if (plans[target] != "") {
+            printf "plan:     %s\n", plans[target]
+            lineage_emitted = 1
+        }
+        if (epics[target] != "") {
+            printf "epic:     %s\n", epics[target]
+            lineage_emitted = 1
+        }
+        if (lineage_emitted) print ""
 
         # Now output the target file with enhancements
         in_front = 0
