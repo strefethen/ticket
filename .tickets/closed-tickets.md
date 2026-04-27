@@ -4,7 +4,7 @@
 
 Historical archive of closed tickets for this doc set. Regenerated on each `tk sidebar` run. Active work lives in the sidebar and [tree index](./index.md).
 
-Total: **20**
+Total: **21**
 
 ## [tlf-tvm6](./tlf-tvm6.md) — Extend tk status with --stage flag and declared-but-not-modified check
 
@@ -59,6 +59,12 @@ Total: **20**
 - **Type**: task
 - **Priority**: P1
 - **Close reason**: TOML validates. Codex will fire scripts on next session start. Real-codex verification deferred to Phase 7 integration.
+
+## [tic-t42k](./tic-t42k.md) — pre-commit hook drift test
+
+- **Type**: chore
+- **Priority**: P4
+- **Close reason**: smoke test of pre-commit hook
 
 ## [tic-syb2](./tic-syb2.md) — phase3 set-goal sandbox
 
