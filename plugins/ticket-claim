@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # tk-plugin: Acquire a write claim on a file path via Redis
-# tk-plugin-version: 0.1.0
+# tk-plugin-version: 0.1.1
 #
 # Usage: tk claim <ticket-id> <abs-path>
 #
@@ -31,6 +31,14 @@ fi
 TICKET="$1"
 RAW_PATH="$2"
 
+if [[ -z "$TICKET" ]]; then
+    # An empty ticket-id corrupts the per-ticket index Set key
+    # (tk:<repo>:ticket-claims:) and produces orphaned entries that
+    # can't be enumerated by ticket. Refuse loudly.
+    echo "Error: ticket-id is empty. Caller must resolve an active ticket before claiming." >&2
+    exit 1
+fi
+
 if [[ "$RAW_PATH" = /* ]]; then
     ABS_PATH="$RAW_PATH"
 else
@@ -50,7 +58,7 @@ else
     REPO=$(basename "$PWD")
 fi
 
-AGENT="${TK_AGENT_ID:-unknown}"
+AGENT="${TK_AGENT_ID:-${USER:-anon}-${PPID}}"
 NOW=$(date -u +%s)
 TTL=300
 
@@ -93,7 +101,7 @@ if existing then
 else
     redis.call("SET", key, new_value, "EX", ttl)
     redis.call("SADD", idx, path)
-    redis.call("XADD", stream, "*",
+    redis.call("XADD", stream, "MAXLEN", "~", "1000", "*",
         "event", "acquire",
         "ticket", ticket,
         "agent", agent,

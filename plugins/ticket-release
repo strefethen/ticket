@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # tk-plugin: Release a write claim on a file path
-# tk-plugin-version: 0.1.0
+# tk-plugin-version: 0.1.1
 #
 # Usage: tk release <ticket-id> <abs-path>
 #
@@ -36,7 +36,7 @@ else
     REPO=$(basename "$PWD")
 fi
 
-AGENT="${TK_AGENT_ID:-unknown}"
+AGENT="${TK_AGENT_ID:-${USER:-anon}-${PPID}}"
 NOW=$(date -u +%s)
 
 redis() {
@@ -64,7 +64,7 @@ if existing then
     if ok and existing_data.ticket_id == ticket then
         redis.call("DEL", key)
         redis.call("SREM", idx, path)
-        redis.call("XADD", stream, "*",
+        redis.call("XADD", stream, "MAXLEN", "~", "1000", "*",
             "event", "release",
             "ticket", ticket,
             "agent", agent,

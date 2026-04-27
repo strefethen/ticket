@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # tk-plugin: Force-release a stuck file claim (recovery for crashed sessions)
-# tk-plugin-version: 1.0.0
+# tk-plugin-version: 1.0.1
 #
 # Usage: tk force-release <path>
 #
@@ -46,7 +46,7 @@ else
     REPO=$(basename "$PWD")
 fi
 
-CALLER="${TK_AGENT_ID:-unknown}"
+CALLER="${TK_AGENT_ID:-${USER:-anon}-${PPID}}"
 NOW=$(date -u +%s)
 
 redis() {
@@ -83,7 +83,7 @@ if ok and existing_data.ticket_id then
 end
 
 redis.call("DEL", key)
-redis.call("XADD", stream, "*",
+redis.call("XADD", stream, "MAXLEN", "~", "1000", "*",
     "event", "force-release",
     "ticket", original_ticket,
     "forced_by", caller,

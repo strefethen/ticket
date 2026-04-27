@@ -5,6 +5,16 @@
 ### Added
 - `scripts/git-hooks/pre-commit` — runs `tk sidebar` before each commit and stages any regenerated artifacts (`_sidebar.json`, `index.md`, `closed-tickets.md`). Activate with `git config core.hooksPath scripts/git-hooks` once per clone. Bypass with `git commit --no-verify`. Fires for any agent (Claude, Codex, human) since git hooks are agent-agnostic.
 
+### Fixed
+- Audit stream (`tk:<repo>:audit:claims`) now self-bounds via `XADD ... MAXLEN ~ 1000` in `tk claim`, `tk release`, and `tk force-release`. Previously the stream grew unbounded, accumulating days of history and burying recent activity — a working system would look indistinguishable from a leak-ridden one when read with `tk audit`.
+- `tk claim` refuses an empty ticket-id explicitly. Previously an empty `$1` produced an orphaned per-ticket index Set at `tk:<repo>:ticket-claims:` (no ticket suffix) that could not be enumerated by ticket and surfaced as a phantom "leak" in audit reviews.
+- `TK_AGENT_ID` fallback across `tk claim`, `tk release`, `tk force-release` changed from the literal string `"unknown"` to `${USER:-anon}-${PPID}`. Restores agent-attribution signal in environments where the caller forgot to set `TK_AGENT_ID`; concurrent sessions are distinguishable by PPID.
+
+### Plugins
+- ticket-claim 0.1.1: Refuse empty ticket-id; bound audit stream to `MAXLEN ~ 1000`; identify agent by `${USER}-${PPID}` when `TK_AGENT_ID` unset.
+- ticket-release 0.1.1: Bound audit stream to `MAXLEN ~ 1000`; identify agent by `${USER}-${PPID}` when `TK_AGENT_ID` unset.
+- ticket-force-release 1.0.1: Bound audit stream to `MAXLEN ~ 1000`; identify caller by `${USER}-${PPID}` when `TK_AGENT_ID` unset.
+
 ## [0.4.0] - 2026-04-26
 
 First release on the `strefethen/ticket` fork. Establishes the agent-first
