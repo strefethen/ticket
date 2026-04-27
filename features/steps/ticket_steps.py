@@ -152,6 +152,55 @@ def step_lint_ready_ticket_exists(context, ticket_id, title):
     create_lint_ready_ticket(context, ticket_id, title)
 
 
+@given(r'a lint-ready ticket exists with ID "(?P<ticket_id>[^"]+)", writes "(?P<writes>[^"]+)" and testing "(?P<testing>[^"]*)"')
+def step_lint_ticket_with_writes_and_testing(context, ticket_id, writes, testing):
+    """Create a lint-ready ticket with custom writes (comma-separated paths)
+    and Testing Obligations text — used to exercise the writes-tests check."""
+    paths = [p.strip() for p in writes.split(",") if p.strip()]
+    writes_yaml = "\n".join(f"  - {p}" for p in paths)
+    testing_body = testing if testing else "- Manual smoke."
+    tickets_dir = Path(context.test_dir) / '.tickets'
+    tickets_dir.mkdir(parents=True, exist_ok=True)
+    ticket_path = tickets_dir / f'{ticket_id}.md'
+    content = f"""---
+id: {ticket_id}
+status: open
+deps: []
+links: []
+created: 2024-01-01T00:00:00Z
+type: task
+priority: 2
+tags: [epic:test]
+plan: plans/current/demo.md
+writes:
+{writes_yaml}
+reads:
+  - README.md
+---
+# Lint writes-tests fixture
+
+## Goal
+
+Exercise the writes-tests lint check.
+
+## Design
+
+Use the writes/testing fields supplied by the scenario.
+
+## Acceptance Criteria
+
+- The lint output reflects the writes-tests check status.
+
+## Testing Obligations
+
+{testing_body}
+"""
+    ticket_path.write_text(content)
+    if not hasattr(context, 'tickets'):
+        context.tickets = {}
+    context.tickets[ticket_id] = ticket_path
+
+
 @given(r'ticket "(?P<ticket_id>[^"]+)" has status "(?P<status>[^"]+)"')
 def step_ticket_has_status(context, ticket_id, status):
     """Set ticket status."""

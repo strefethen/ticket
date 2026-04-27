@@ -4,6 +4,7 @@
 
 ### Added
 - `scripts/git-hooks/pre-commit` — runs `tk sidebar` before each commit and stages any regenerated artifacts (`_sidebar.json`, `index.md`, `closed-tickets.md`). Activate with `git config core.hooksPath scripts/git-hooks` once per clone. Bypass with `git commit --no-verify`. Fires for any agent (Claude, Codex, human) since git hooks are agent-agnostic.
+- `ticket-lint` writes-tests check — for each path in `writes:`, derive likely test-file candidates by language convention (TS/JS: `X.test.ts`, `X.spec.ts`, `__tests__/X.ts`; Swift: `XTests.swift`; Go: `X_test.go`; Python: `test_X.py`, `tests/test_X.py`; Rust: `tests/X.rs`). If no candidate appears in `writes:` itself or in `## Testing Obligations`, emit a WARN (not FAIL). Silently skipped for paths with no language convention (READMEs, configs) and for paths that are already test files. Catches the "edited source without citing the test that exercises it" miss.
 
 ### Fixed
 - Audit stream (`tk:<repo>:audit:claims`) now self-bounds via `XADD ... MAXLEN ~ 1000` in `tk claim`, `tk release`, and `tk force-release`. Previously the stream grew unbounded, accumulating days of history and burying recent activity — a working system would look indistinguishable from a leak-ridden one when read with `tk audit`.
@@ -14,6 +15,7 @@
 - ticket-claim 0.1.1: Refuse empty ticket-id; bound audit stream to `MAXLEN ~ 1000`; identify agent by `${USER}-${PPID}` when `TK_AGENT_ID` unset.
 - ticket-release 0.1.1: Bound audit stream to `MAXLEN ~ 1000`; identify agent by `${USER}-${PPID}` when `TK_AGENT_ID` unset.
 - ticket-force-release 1.0.1: Bound audit stream to `MAXLEN ~ 1000`; identify caller by `${USER}-${PPID}` when `TK_AGENT_ID` unset.
+- ticket-lint 0.6.0: Adds writes-tests check (per-language test-file pairing — TS/JS, Swift, Go, Python, Rust). 3 new Behave scenarios cover warn / pass / silent-skip cases.
 
 ## [0.4.0] - 2026-04-26
 

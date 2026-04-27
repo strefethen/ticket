@@ -4,7 +4,7 @@
 
 Historical archive of closed tickets for this doc set. Regenerated on each `tk sidebar` run. Active work lives in the sidebar and [tree index](./index.md).
 
-Total: **21**
+Total: **27**
 
 ## [tlf-tvm6](./tlf-tvm6.md) — Extend tk status with --stage flag and declared-but-not-modified check
 
@@ -78,11 +78,29 @@ Total: **21**
 - **Priority**: P2
 - **Close reason**: Plugin gone, coverage migrated to set-* tests, docs scrubbed. Source tree references to ticket-edit confined to CHANGELOG history (intentional).
 
+## [tic-p0yx](./tic-p0yx.md) — test files only
+
+- **Type**: chore
+- **Priority**: P4
+- **Close reason**: smoke
+
+## [tic-oh2e](./tic-oh2e.md) — with-dir paths
+
+- **Type**: chore
+- **Priority**: P4
+- **Close reason**: with-dir smoke
+
 ## [tic-mguk](./tic-mguk.md) — Field-level mutation CLI — first-class commands for every editable section
 
 - **Type**: task
 - **Priority**: P2
 - **Close reason**: Built-in field-level commands replace ticket-edit's role. 160/160 scenarios pass.
+
+## [tic-m7n6](./tic-m7n6.md) — lang variants v2
+
+- **Type**: chore
+- **Priority**: P4
+- **Close reason**: v2 smoke
 
 ## [tic-i3zk](./tic-i3zk.md) — Documentation reframe — README, CLAUDE.md, AGENTS.md stop celebrating markdown-on-disk
 
@@ -102,17 +120,35 @@ Total: **21**
 - **Priority**: P2
 - **Close reason**: Close output kept clean (single status line); audit stream records release. Behave passes. Best-effort fallthrough on Redis errors verified by code path.
 
+## [tic-c30g](./tic-c30g.md) — writes-tests smoke
+
+- **Type**: chore
+- **Priority**: P4
+- **Close reason**: smoke test of writes-tests check
+
 ## [tic-9xdv](./tic-9xdv.md) — close-autorelease test silenced
 
 - **Type**: task
 - **Priority**: P3
 - **Close reason**: verify clean output
 
+## [tic-7y1v](./tic-7y1v.md) — writes-tests skip-no-source
+
+- **Type**: chore
+- **Priority**: P4
+- **Close reason**: smoke test of writes-tests check
+
 ## [tic-2shj](./tic-2shj.md) — tk force-release plugin — recovery for stuck claims
 
 - **Type**: task
 - **Priority**: P2
 - **Close reason**: Audit log clearly distinguishes recovery (force-release) from normal flow (release). Verified atomically via single Lua EVAL.
+
+## [tic-1005](./tic-1005.md) — lang variants
+
+- **Type**: chore
+- **Priority**: P4
+- **Close reason**: smoke
 
 ## [tic-0srz](./tic-0srz.md) — Codex hook scripts — apply_patch acquire, audit, heartbeat
 

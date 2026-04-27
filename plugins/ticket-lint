@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # tk-plugin: Validate tickets against the handoff schema
-# tk-plugin-version: 0.5.1
+# tk-plugin-version: 0.6.0
 #
 # Usage:
 #   tk lint <id>           Check one ticket, pretty output, exit 0 pass / 1 fail
@@ -73,6 +73,84 @@ fi
 # Extract lint signals from a single file via awk.
 # Output format (pipe-separated, one line):
 #   writes_count|reads_count|plan|design_lines|acceptance_lines|type|priority|id
+# Emit each path under `writes:` (one per line, leading "  - " stripped).
+extract_writes_paths() {
+    awk '
+        /^---$/ { fm = !fm; next }
+        !fm { exit }
+        /^writes:/ { in_w = 1; next }
+        /^[a-z]/    { in_w = 0 }
+        in_w && /^  - / { sub(/^  - /, ""); print }
+    ' "$1"
+}
+
+# Emit the body of the ## Testing Obligations section (everything until the
+# next ## heading). Used as a haystack for paired-test references.
+extract_testing_text() {
+    awk '
+        /^## Testing Obligations[[:space:]]*$/ { in_t = 1; next }
+        /^## /                                  { in_t = 0 }
+        in_t
+    ' "$1"
+}
+
+# Given a source path, emit candidate test-file paths (one per line) using
+# language conventions. No output → no candidates derivable; the caller
+# should skip this path silently (e.g., README.md, glob patterns,
+# already-a-test files, unrecognized extensions).
+derive_test_candidates() {
+    local path="$1"
+    # Skip glob patterns — can't derive a deterministic test path
+    case "$path" in *'*'*|*'?'*|*'['*) return ;; esac
+
+    local dir base ext stem prefix
+    dir=$(dirname "$path")
+    base=$(basename "$path")
+    ext="${base##*.}"
+    stem="${base%.*}"
+
+    # When the source is at repo root, dirname yields ".". Emitting "./X"
+    # candidates fails substring matches against plain references like
+    # "FooTests.swift" in Testing Obligations. Use empty prefix in that
+    # case so candidates match either with or without a leading dir.
+    if [[ "$dir" == "." || -z "$dir" ]]; then
+        prefix=""
+    else
+        prefix="$dir/"
+    fi
+
+    case "$ext" in
+        ts|tsx|js|jsx)
+            # Already a test file — skip
+            case "$stem" in *.test|*.spec) return ;; esac
+            case "$dir" in */__tests__|__tests__) return ;; esac
+            echo "${prefix}${stem}.test.$ext"
+            echo "${prefix}${stem}.spec.$ext"
+            echo "${prefix}__tests__/${stem}.$ext"
+            ;;
+        swift)
+            case "$stem" in *Tests) return ;; esac
+            echo "${prefix}${stem}Tests.swift"
+            ;;
+        go)
+            case "$stem" in *_test) return ;; esac
+            echo "${prefix}${stem}_test.go"
+            ;;
+        py)
+            case "$stem" in test_*|*_test) return ;; esac
+            echo "${prefix}test_${stem}.py"
+            echo "${prefix}tests/test_${stem}.py"
+            ;;
+        rs)
+            # Rust inline #[cfg(test)] modules can't be path-detected.
+            # External integration tests live at tests/<name>.rs at crate root.
+            # Emit that as the only structural candidate.
+            echo "tests/${stem}.rs"
+            ;;
+        # Any other extension: no test convention encoded — skip silently.
+    esac
+}
+
 extract_signals() {
     awk '
     BEGIN {
@@ -223,6 +301,51 @@ lint_one() {
     else
         checks+=("testing|fail|## Testing Obligations section missing or empty")
         overall="fail"
+    fi
+
+    # writes-tests: each source path in writes: should have a paired test
+    # file referenced — either in writes: itself or in the Testing
+    # Obligations section. WARN (not FAIL) when missing — many cases are
+    # legitimate (refactoring without behavior change, doc-only edits).
+    local writes_paths
+    writes_paths=$(extract_writes_paths "$file")
+    if [[ -n "$writes_paths" ]]; then
+        local testing_text haystack
+        testing_text=$(extract_testing_text "$file")
+        haystack="$writes_paths"$'\n'"$testing_text"
+
+        local checked=0
+        local -a missing=()
+        while IFS= read -r path; do
+            [[ -z "$path" ]] && continue
+            local candidates
+            candidates=$(derive_test_candidates "$path")
+            [[ -z "$candidates" ]] && continue
+            checked=$((checked + 1))
+            local found=0
+            while IFS= read -r cand; do
+                [[ -z "$cand" ]] && continue
+                if grep -Fq -- "$cand" <<< "$haystack"; then
+                    found=1
+                    break
+                fi
+            done <<< "$candidates"
+            (( found == 0 )) && missing+=("$path")
+        done <<< "$writes_paths"
+
+        if (( checked > 0 )); then
+            if (( ${#missing[@]} > 0 )); then
+                local detail
+                if (( ${#missing[@]} <= 2 )); then
+                    detail="${#missing[@]} path(s) lack paired test reference: $(IFS=', '; echo "${missing[*]}")"
+                else
+                    detail="${#missing[@]} path(s) lack paired test reference: ${missing[0]}, ${missing[1]}, +$((${#missing[@]} - 2)) more"
+                fi
+                checks+=("writes-tests|warn|$detail")
+            else
+                checks+=("writes-tests|pass|$checked source path(s) have paired test references")
+            fi
+        fi
     fi
 
     if (( JSON == 1 )); then
